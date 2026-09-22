@@ -48,7 +48,15 @@
   --color-fg: #e8e8e8;
   --color-fg-muted: #9a9a9a;
   --color-fg-faint: #6e6e6e;
+  /* Indicateurs, anneaux de focus, remplissage de curseur, boîte de
+     transformation — tout ce qui ne porte pas de texte. */
   --color-accent: #2d7ff9;
+  /* Fonds qui portent du texte : lignes sélectionnées, entrées de menu.
+     Plus sombre à dessein — du blanc sur `--color-accent` plafonne à
+     3,81 : 1, sous le 4,5 : 1 que WCAG demande pour du texte. Le bleu
+     système de macOS est à 3,65 : 1 : l'original ne passe pas non plus, et
+     c'est un écart assumé. */
+  --color-selection: #1f6feb;
   --color-accent-fg: #ffffff;
 }
 
