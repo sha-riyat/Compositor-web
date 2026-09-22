@@ -134,6 +134,13 @@ export const Editor = (): React.ReactElement => {
             tool={moveTool}
             onCompositorReady={(compositor) => {
               compositorRef.current = compositor;
+              // En développement seulement : la suite Playwright compose par
+              // cette référence, sans dépendre d'une trame d'animation — un
+              // onglet masqué n'en reçoit pas.
+              if (import.meta.env.DEV) {
+                const globals = window as unknown as { __compositor?: Record<string, unknown> };
+                globals.__compositor = { ...globals.__compositor, compositor };
+              }
             }}
           />
 
