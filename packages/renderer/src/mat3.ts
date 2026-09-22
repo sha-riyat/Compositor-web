@@ -65,3 +65,24 @@ export const mat3ForTransform = (transform: Transform): Mat3 => {
 /** Document → vue, selon le zoom et le décalage du viewport. */
 export const mat3View = (scale: number, offsetX: number, offsetY: number): Mat3 =>
   mat3Multiply(mat3Translate(offsetX, offsetY), mat3Scale(scale, scale));
+
+/**
+ * Inverse d'une matrice 3×3. Rend l'identité si la matrice est singulière —
+ * un calque de taille nulle ne doit pas faire disparaître le rendu.
+ */
+export const mat3Invert = (m: Mat3): Mat3 => {
+  const [a, b, c, d, e, f, g, h, i] = m as unknown as number[] as [
+    number, number, number, number, number, number, number, number, number,
+  ];
+  const A = e * i - f * h;
+  const B = f * g - d * i;
+  const C = d * h - e * g;
+  const det = a * A + b * B + c * C;
+  if (Math.abs(det) < 1e-12) return mat3Identity();
+  const inv = 1 / det;
+  return new Float32Array([
+    A * inv, (c * h - b * i) * inv, (b * f - c * e) * inv,
+    B * inv, (a * i - c * g) * inv, (c * d - a * f) * inv,
+    C * inv, (b * g - a * h) * inv, (a * e - b * d) * inv,
+  ]);
+};
