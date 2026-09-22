@@ -29,3 +29,14 @@ dist/
 dist-types/
 *.tsbuildinfo
 .vite/
+
+# Outillage d'agent — hors du dépôt du projet.
+# `launch.json` fait exception : il configure le serveur de développement,
+# pas un agent.
+.claude/*
+!.claude/launch.json
+AGENTS.md
+
+# Playwright
+test-results/
+playwright-report/
