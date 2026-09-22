@@ -2,6 +2,7 @@ import { Eye, EyeSlash } from '@phosphor-icons/react';
 import { Button, ListBox, ListBoxItem } from 'react-aria-components';
 import { useStore } from 'zustand';
 import { documentStore, replaceLayer, type Layer } from '@compositor/model';
+import { LayerAppearance } from './LayerAppearance.js';
 
 /**
  * Le panneau de calques, version T1 : **liste plate, sans glisser-déposer ni
@@ -34,6 +35,8 @@ export const LayerList = (): React.ReactElement => {
       <header className="flex h-[28px] shrink-0 items-center border-b border-(--color-border) px-2 text-ui font-medium">
         Calques
       </header>
+
+      <LayerAppearance />
 
       {rows.length === 0 ? (
         <p className="p-3 text-ui text-(--color-fg-faint)">

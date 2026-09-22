@@ -16,6 +16,7 @@ import {
   watchDevicePixelRatio,
 } from '@compositor/renderer';
 import { TransactionLog } from './history.js';
+import { getBlendPreview, subscribeBlendPreview } from './blendPreview.js';
 
 /**
  * Le canevas. **Il n'est jamais rendu par React** : React monte l'élément une
@@ -56,10 +57,12 @@ export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.
       resizeToDisplay(context);
       const { document, activeLayerId } = documentStore.getState();
       const ui = uiStore.getState();
-      compositor.render(document, ui.viewport, {
-        activeLayerId,
-        showsTransformBox: ui.showsTransformBox,
-      });
+      compositor.render(
+        document,
+        ui.viewport,
+        { activeLayerId, showsTransformBox: ui.showsTransformBox },
+        getBlendPreview(),
+      );
     };
 
     const requestRedraw = (): void => {
@@ -212,6 +215,7 @@ export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.
 
     const unsubscribeDocument = documentStore.subscribe(requestRedraw);
     const unsubscribeUI = uiStore.subscribe(requestRedraw);
+    const unsubscribePreview = subscribeBlendPreview(requestRedraw);
     const unwatchDpr = watchDevicePixelRatio(requestRedraw);
     const observer = new ResizeObserver(requestRedraw);
     observer.observe(canvas);
@@ -225,6 +229,7 @@ export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.
       unwatchDpr();
       unsubscribeDocument();
       unsubscribeUI();
+      unsubscribePreview();
       canvas.removeEventListener('pointerdown', onPointerDown);
       if (supportsRawUpdate) {
         canvas.removeEventListener('pointerrawupdate', onRawUpdate as EventListener);
