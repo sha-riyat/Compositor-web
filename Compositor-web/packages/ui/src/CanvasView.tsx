@@ -245,7 +245,7 @@ export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <canvas ref={canvasRef} className="h-full w-full" />;
+  return <canvas ref={canvasRef} data-role="document" className="h-full w-full" />;
 };
 
 const clamp = (value: number, min: number, max: number): number =>
