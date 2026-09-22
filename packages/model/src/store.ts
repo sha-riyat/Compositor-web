@@ -20,13 +20,21 @@ import { AssetStore } from './assets.js';
 
 export interface DocumentState {
   document: CompositorDocument | null;
+  /** Le calque principal : celui que les panneaux affichent. */
   activeLayerId: LayerId | null;
+  /**
+   * La sélection complète. Contient toujours `activeLayerId` quand il existe.
+   * Les opérations qui portent sur « les calques sélectionnés » lisent ceci et
+   * ne poussent qu'une seule entrée d'historique.
+   */
+  selectedLayerIds: readonly LayerId[];
   readonly assets: AssetStore;
 }
 
 export const documentStore = createStore<DocumentState>(() => ({
   document: null,
   activeLayerId: null,
+  selectedLayerIds: [],
   assets: new AssetStore(),
 }));
 
@@ -73,6 +81,8 @@ export interface UIState {
    */
   autoSelect: boolean;
   showsTransformBox: boolean;
+  /** Verrouillé par défaut, comme `locksTransformRatio` dans le Swift. */
+  locksTransformRatio: boolean;
 }
 
 export const uiStore = createStore<UIState>(() => ({
@@ -80,14 +90,33 @@ export const uiStore = createStore<UIState>(() => ({
   viewport: { scale: 1, offsetX: 0, offsetY: 0 },
   autoSelect: false,
   showsTransformBox: true,
+  locksTransformRatio: true,
 }));
 
 export const setDocument = (document: CompositorDocument | null): void => {
-  documentStore.setState({ document, activeLayerId: null });
+  documentStore.setState({ document, activeLayerId: null, selectedLayerIds: [] });
 };
 
 export const setActiveLayer = (activeLayerId: LayerId | null): void => {
-  documentStore.setState({ activeLayerId });
+  documentStore.setState({
+    activeLayerId,
+    selectedLayerIds: activeLayerId === null ? [] : [activeLayerId],
+  });
+};
+
+/**
+ * Sélectionne plusieurs calques, `primary` devenant le calque actif. Sans
+ * `primary`, c'est le dernier de la liste — le plus récemment désigné.
+ */
+export const selectLayers = (
+  ids: readonly LayerId[],
+  primary?: LayerId | null,
+): void => {
+  const active = primary ?? (ids.length > 0 ? ids[ids.length - 1]! : null);
+  documentStore.setState({
+    selectedLayerIds: ids,
+    activeLayerId: active !== null && ids.includes(active) ? active : (ids[0] ?? null),
+  });
 };
 
 export const setTool = (tool: ToolId): void => {
