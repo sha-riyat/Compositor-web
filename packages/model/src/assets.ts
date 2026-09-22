@@ -1,0 +1,94 @@
+import type { AssetId } from './layer.js';
+
+/**
+ * Les pixels d'un calque, côté CPU.
+ *
+ * **Invariant ④ — le CPU reste la source de vérité, le GPU est un cache.**
+ * Ces octets sont ce que relisent l'export, la sauvegarde et les noyaux WASM.
+ * Le `renderer` tient en parallèle un cache de textures indexé par `AssetId`,
+ * qu'il peut vider à tout moment sans rien perdre.
+ *
+ * Format : RGBA 8 bits **prémultiplié**, octets dans l'ordre R, G, B, A, en
+ * sRGB non linéaire. C'est exactement ce que produit le Swift
+ * (`premultipliedLast` + `byteOrder32Big` + espace sRGB) et ce qu'attendent les
+ * huit noyaux C.
+ */
+export interface PixelBuffer {
+  readonly width: number;
+  readonly height: number;
+  /**
+   * Tampon non partagé : `ImageData` refuse un `SharedArrayBuffer`. En T4, les
+   * tuiles destinées aux workers auront leur propre type.
+   */
+  readonly data: Uint8ClampedArray<ArrayBuffer>;
+}
+
+interface Entry {
+  readonly buffer: PixelBuffer;
+  refCount: number;
+  /** Incrémentée à chaque écriture : les caches s'en servent pour s'invalider. */
+  revision: number;
+}
+
+/**
+ * Magasin de pixels à comptage de références. Le modèle de document ne contient
+ * que des `AssetId` ; plusieurs instantanés d'historique partagent donc les
+ * mêmes pixels sans les copier — c'est ce que fait `DocumentHistory.swift`.
+ */
+export class AssetStore {
+  #entries = new Map<AssetId, Entry>();
+  #nextId = 1;
+
+  add(buffer: PixelBuffer): AssetId {
+    const id = `asset-${this.#nextId++}`;
+    this.#entries.set(id, { buffer, refCount: 1, revision: 1 });
+    return id;
+  }
+
+  get(id: AssetId): PixelBuffer | undefined {
+    return this.#entries.get(id)?.buffer;
+  }
+
+  revision(id: AssetId): number {
+    return this.#entries.get(id)?.revision ?? 0;
+  }
+
+  /** À appeler après avoir écrit dans `data`, pour que les caches se refassent. */
+  touch(id: AssetId): void {
+    const entry = this.#entries.get(id);
+    if (entry !== undefined) entry.revision++;
+  }
+
+  retain(id: AssetId): void {
+    const entry = this.#entries.get(id);
+    if (entry !== undefined) entry.refCount++;
+  }
+
+  release(id: AssetId): void {
+    const entry = this.#entries.get(id);
+    if (entry === undefined) return;
+    entry.refCount--;
+    if (entry.refCount <= 0) this.#entries.delete(id);
+  }
+
+  get size(): number {
+    return this.#entries.size;
+  }
+
+  /** Octets détenus, pour le budget mémoire (le GPU n'est pas interrogeable). */
+  get byteLength(): number {
+    let total = 0;
+    for (const entry of this.#entries.values()) total += entry.buffer.data.byteLength;
+    return total;
+  }
+
+  clear(): void {
+    this.#entries.clear();
+  }
+}
+
+export const createPixelBuffer = (width: number, height: number): PixelBuffer => ({
+  width,
+  height,
+  data: new Uint8ClampedArray(width * height * 4),
+});
