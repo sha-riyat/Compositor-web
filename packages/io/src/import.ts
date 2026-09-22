@@ -1,4 +1,4 @@
-import type { PixelBuffer } from '@compositor/model';
+import { isFullyOpaque, type PixelBuffer } from '@compositor/model';
 import { premultiply } from './alpha.js';
 
 /**
@@ -62,10 +62,12 @@ export const decodeImageFile = async (
 
     // `getImageData` rend toujours de l'alpha **droit** : on repasse en
     // prémultiplié, le format attendu partout ailleurs (invariant ②).
+    const data = premultiply(imageData.data);
     return {
       width: bitmap.width,
       height: bitmap.height,
-      data: premultiply(imageData.data),
+      data,
+      isOpaque: isFullyOpaque(data),
     };
   } finally {
     bitmap.close();

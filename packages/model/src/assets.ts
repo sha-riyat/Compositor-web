@@ -21,6 +21,12 @@ export interface PixelBuffer {
    * tuiles destinées aux workers auront leur propre type.
    */
   readonly data: Uint8ClampedArray<ArrayBuffer>;
+  /**
+   * Vrai si aucun pixel n'est partiellement transparent. Calculé une fois à
+   * l'import : la barre d'état s'en sert pour annoncer `sRGB · Transparent`
+   * honnêtement, plutôt que de le supposer.
+   */
+  readonly isOpaque: boolean;
 }
 
 interface Entry {
@@ -91,4 +97,13 @@ export const createPixelBuffer = (width: number, height: number): PixelBuffer =>
   width,
   height,
   data: new Uint8ClampedArray(width * height * 4),
+  isOpaque: false,
 });
+
+/** Un seul balayage des alphas — quelques millisecondes même en 4096². */
+export const isFullyOpaque = (data: Uint8ClampedArray): boolean => {
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] !== 255) return false;
+  }
+  return true;
+};

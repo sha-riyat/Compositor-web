@@ -1,5 +1,6 @@
 import type { Layer, LayerId } from './layer.js';
 import { transformContains } from './geometry.js';
+import type { AssetStore } from './assets.js';
 
 /**
  * Limites reprises de `reference/docs/project-format.md`. Celle des côtés est
@@ -81,3 +82,31 @@ export const topmostLayerAt = (
 
 export const isValidDimension = (value: number, max: number = LIMITS.maxSide): boolean =>
   Number.isInteger(value) && value >= 1 && value <= max;
+
+/**
+ * Un document est opaque si un calque visible, à pleine opacité et en mode
+ * Normal, couvre entièrement la toile avec des pixels sans transparence.
+ *
+ * C'est ce que la barre d'état annonce : `sRGB` seul, ou `sRGB · Transparent`.
+ * Le test est volontairement conservateur — un doute rend « transparent »,
+ * ce qui est le cas le plus fréquent et le moins trompeur.
+ */
+export const isDocumentOpaque = (
+  document: CompositorDocument,
+  assets: AssetStore,
+): boolean =>
+  document.layers.some((layer) => {
+    if (!layer.isVisible || layer.isGroup || layer.asset === null) return false;
+    if (layer.opacity < 1 || layer.blendMode !== 'normal') return false;
+    if (layer.parentId !== null) return false;
+
+    const { origin, size } = layer.transform;
+    const covers =
+      origin.x <= 0 &&
+      origin.y <= 0 &&
+      origin.x + size.width >= document.width &&
+      origin.y + size.height >= document.height;
+    if (!covers || layer.transform.radians !== 0) return false;
+
+    return assets.get(layer.asset)?.isOpaque === true;
+  });
