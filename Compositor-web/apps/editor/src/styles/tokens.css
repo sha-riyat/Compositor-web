@@ -1,0 +1,75 @@
+/* --------------------------------------------------------------------------
+   L'échelle par défaut de Tailwind est celle d'un site web : texte 16 px,
+   contrôles 40 px, espacements par 4. Elle est ici remplacée — pas étendue —
+   par les métriques relevées dans `Compositor/Compositor/UI/`.
+
+   `--spacing: initial` purge l'échelle d'origine, pour que `p-4` (16 px chez
+   Tailwind) ne puisse pas se glisser là où il fallait 8.
+   -------------------------------------------------------------------------- */
+
+@theme {
+  --spacing: initial;
+  --spacing-px: 1px;
+  --spacing-0: 0px;
+  --spacing-0_5: 2px;
+  --spacing-1: 5px;
+  --spacing-1_5: 6px;
+  --spacing-2: 8px;
+  --spacing-2_5: 10px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+
+  --height-control-sm: 18px;
+  --height-control: 20px;
+  --height-control-lg: 28px;
+  --height-field: 36px;
+  --height-layer-row: 52px;
+  --height-tool-header: 36px;
+
+  --radius: initial;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+
+  --text-ui: 11px;
+  --text-ui--line-height: 14px;
+  --text-ui-lg: 13px;
+  --text-ui-lg--line-height: 16px;
+
+  --font-ui: 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+  /* Les widgets dessinés au canevas — règles, courbes, histogramme — ne peuvent
+     pas porter de classe : ils lisent ces jetons via `getComputedStyle`. */
+  --color-canvas: #1a1a1a;
+  --color-panel: #2b2b2b;
+  --color-panel-raised: #333333;
+  --color-panel-sunken: #232323;
+  --color-border: #3c3c3c;
+  --color-fg: #e8e8e8;
+  --color-fg-muted: #9a9a9a;
+  --color-fg-faint: #6e6e6e;
+  /* Indicateurs, anneaux de focus, remplissage de curseur, boîte de
+     transformation — tout ce qui ne porte pas de texte. */
+  --color-accent: #2d7ff9;
+  /* Fonds qui portent du texte : lignes sélectionnées, entrées de menu.
+     Plus sombre à dessein — du blanc sur `--color-accent` plafonne à
+     3,81 : 1, sous le 4,5 : 1 que WCAG demande pour du texte. Le bleu
+     système de macOS est à 3,65 : 1 : l'original ne passe pas non plus, et
+     c'est un écart assumé. */
+  --color-selection: #1f6feb;
+  --color-accent-fg: #ffffff;
+}
+
+/* Thème clair, à compléter en T2. Les jetons changent, rien d'autre. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --color-canvas: #d4d4d4;
+    --color-panel: #f0f0f0;
+    --color-panel-raised: #ffffff;
+    --color-panel-sunken: #e4e4e4;
+    --color-border: #c8c8c8;
+    --color-fg: #1a1a1a;
+    --color-fg-muted: #5c5c5c;
+    --color-fg-faint: #8e8e8e;
+  }
+}

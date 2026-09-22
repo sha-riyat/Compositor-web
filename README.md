@@ -1,65 +1,57 @@
-# Compositor Web
+# Compositor
 
-Portage vers le web de [Compositor](https://github.com/robbietilton/Compositor), un éditeur d'images macOS libre écrit en Swift.
+Un éditeur d'images complet et libre, en deux versions : l'application macOS native d'origine, et son portage vers le navigateur.
 
-L'objectif est un éditeur complet qui tourne dans le navigateur : calques, masques, groupes, sélections, brosse, réglages et effets, avec une fidélité suffisante pour qu'un fichier passe d'une version à l'autre sans perte.
+Ce dépôt les contient toutes les deux, côte à côte — parce que la version web se construit **en lisant** la version macOS, et non en la devinant.
 
-Le code Swift d'origine est conservé dans [`reference/`](reference/) comme **spécification en lecture seule** — modèle de document, format `.comp`, noyaux pixel en C et 54 fichiers de tests qui décrivent le comportement attendu.
+| Dossier | Ce que c'est | État |
+|---|---|---|
+| [`Compositor/`](Compositor/) | L'application macOS, en Swift | Terminée, en lecture seule ici |
+| [`Compositor-web/`](Compositor-web/) | Le portage navigateur, en TypeScript | En construction |
 
-## État
+Chacun a son propre README : [celui de l'application macOS](Compositor/README.md), [celui du portage web](Compositor-web/README.md).
 
-**T1 — le squelette qui marche.** Déposer un PNG, le déplacer, le redimensionner, l'exporter. C'est peu, et c'est délibéré : cette tranche existe pour éprouver l'architecture de bout en bout avant d'empiler quoi que ce soit.
+---
 
-Ce qui n'est pas encore là : les modes de fusion, les masques, les groupes, l'annulation, le format `.comp`, la brosse, les sélections, les réglages, le texte. Chacun a sa tranche, dans l'ordre.
+## D'où ça vient
+
+Compositor est un éditeur d'images pour macOS écrit par [Wonder Assembly](https://github.com/robbietilton/Compositor) : calques et dossiers, masques, quatorze modes de fusion, sélections, brosse et retouche, réglages, filtres, effets de calque, texte, import PSD. Tout ce qu'on attend d'un outil de compositing, gratuitement et sous licence MIT.
+
+Il ne tourne que sur macOS. Ce dépôt en construit une version qui tourne partout.
+
+## Pourquoi les deux ensemble
+
+La version Swift n'est pas là par nostalgie : **c'est la spécification du portage.**
+
+Elle apporte quatre choses qu'aucune documentation ne remplacerait :
+
+**Le modèle de document**, déjà conçu et éprouvé. Un tableau plat de calques plus un `parentId`, des transformations non destructives, un format `.comp` versionné de 1 à 8 avec ses règles de rejet.
+
+**Les huit noyaux pixel en C** — baguette magique, correcteur, remplissage selon le contenu, bruit, grain, niveaux, distorsion d'objectif. 778 lignes sans dépendance Apple, qui se compilent en WebAssembly **sans modification**.
+
+**Cinquante-quatre fichiers de tests**, qui décrivent le comportement attendu bien mieux qu'une prose le ferait. Traduits au fil des tranches, ils disent si le portage est *fidèle* ou seulement *plausible*.
+
+**Les raisons des décisions.** Les commentaires du code Swift expliquent pourquoi la composition se fait en sRGB non linéaire, pourquoi les traits de brosse sont reconstruits par carrés alignés, pourquoi deux modes de fusion de Core Graphics doivent être contournés. Ces raisons-là valent plus que le code lui-même.
+
+## Ce que le portage change, et ce qu'il garde
+
+**Il garde** le modèle de document, le format de fichier, les métriques d'interface, les raccourcis, et la fidélité des pixels : un `.comp` doit faire l'aller-retour entre les deux versions sans perte.
+
+**Il change** le moteur de rendu. Le compositeur macOS travaille sur le processeur avec Core Graphics ; celui du web travaille sur le GPU en WebGL2. Rien de ce code-là ne se transpose — il se réécrit, en s'appuyant sur ce que l'original a appris.
+
+**Il corrige aussi**, par endroits. Les modes Densité couleur + et − de Core Graphics oublient un terme de la formule de composition, ce que l'application macOS doit contourner. Le shader web écrit la formule complète : sur un fond semi-transparent, l'écart avec l'original atteint 63 niveaux sur 255, et c'est le web qui a raison.
 
 ## Démarrer
 
+**Le portage web** — Node 24 :
+
 ```bash
-nvm use          # Node 24.21.0
-npm install
-npm run dev      # http://localhost:5173
+npm --prefix Compositor-web install
+npm --prefix Compositor-web run dev
 ```
 
-| Commande | Effet |
-|---|---|
-| `npm run dev` | Serveur de développement |
-| `npm run build` | Bundle de production |
-| `npm test` | Suite Vitest, en Node |
-| `npm run typecheck` | Vérification des types du monorepo |
-
-## Structure
-
-```
-packages/
-├── model/      modèle de document, géométrie, stores — TS pur, zéro DOM
-├── kernels/    les 8 noyaux C en WebAssembly (à partir de T6)
-├── renderer/   compositeur WebGL2
-├── io/         import, export, alpha, .comp (à partir de T3)
-└── ui/         React — panneaux uniquement, jamais le canevas
-apps/editor/    l'application Vite
-reference/      le projet Swift d'origine, en lecture seule
-```
-
-## Les quatre invariants
-
-Ils découlent de la lecture du code Swift, pas de préférences, et les changer coûterait une réécriture.
-
-**① On compose en sRGB non linéaire.** Le format interne des textures est `RGBA8`, jamais `SRGB8_ALPHA8` — qui décoderait vers le linéaire à l'échantillonnage. Blender en linéaire fait diverger les valeurs de Photoshop : un gris 80 % esquive vers 62 % au lieu de 100 %.
-
-**② Alpha prémultiplié partout.** Entre l'import et le shader, tout est prémultiplié ; les deux conversions vivent dans un seul fichier, [`packages/io/src/alpha.ts`](packages/io/src/alpha.ts). `UNPACK_PREMULTIPLY_ALPHA_WEBGL` est à `false` : ce drapeau ne sert qu'aux sources DOM, qui arrivent en alpha droit.
-
-**③ Le modèle de document ne possède aucune ressource GPU.** Il ne contient que des `AssetId`. C'est ce qui rendra abordable l'historique par instantanés partagés.
-
-**④ Le CPU reste la source de vérité des pixels, le GPU est un cache.** Toute texture peut être jetée et reconstruite ; l'export, la sauvegarde et les noyaux WASM lisent les octets CPU.
-
-## Technique
-
-TypeScript, Vite, compositeur WebGL2. React 19 et React Aria Components pour les panneaux, Tailwind v4 aux métriques relevées dans l'application macOS, icônes Phosphor, typographie Geist auto-hébergée.
-
-Le canevas n'est **jamais** rendu par React : un rendu par `pointermove` coûterait immédiatement la fluidité du trait.
-
-L'application exige un contexte isolé entre origines (`Cross-Origin-Opener-Policy: same-origin` et `Cross-Origin-Embedder-Policy: require-corp`) pour `SharedArrayBuffer`, que le pool de workers utilisera. Conséquence : tout est auto-hébergé, y compris les polices.
+**L'application macOS** — Xcode 26 sur macOS 26.5, en ouvrant `Compositor/Compositor.xcodeproj`. Rien dans ce dossier n'est compilé ni modifié par le portage.
 
 ## Licence
 
-MIT, comme le projet d'origine — voir [LICENSE](LICENSE).
+MIT pour les deux, comme le projet d'origine — voir [LICENSE](LICENSE).
