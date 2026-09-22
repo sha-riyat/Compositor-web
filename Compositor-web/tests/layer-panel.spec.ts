@@ -1,12 +1,30 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Vignettes du panneau de calques, vérifiées dans l'application qui tourne.
+ * Vignettes et raccourcis d'apparence, vérifiés dans l'application qui tourne.
+ *
+ * Le cas AZERTY est simulé explicitement : la touche marquée « 5 » y produit
+ * `(` sans Maj. Un raccourci qui ne lirait que `event.key` passerait sur un
+ * clavier QWERTY de test et échouerait chez un utilisateur français.
  */
 
 test.describe.configure({ mode: 'serial' });
 
 let page: Page;
+
+interface State {
+  opacity: number;
+  blendMode: string;
+}
+
+const state = (): Promise<State> =>
+  page.evaluate(() => {
+    const { documentStore } = (window as never as {
+      __compositor: { documentStore: { getState(): { document: { layers: State[] } } } };
+    }).__compositor;
+    const layer = documentStore.getState().document.layers[0]!;
+    return { opacity: layer.opacity, blendMode: layer.blendMode };
+  });
 
 /** Un calque rouge pur, sélectionné, opacité 100 %, mode Normal. */
 const reset = (): Promise<void> =>
@@ -36,6 +54,15 @@ const reset = (): Promise<void> =>
     });
   });
 
+/** Presse une touche comme le ferait un clavier réel, avec sa touche physique. */
+const press = (key: string, code: string, shiftKey = false): Promise<void> =>
+  page.evaluate(
+    ({ key, code, shiftKey }) => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key, code, shiftKey, bubbles: true }));
+    },
+    { key, code, shiftKey },
+  );
+
 test.beforeAll(async ({ browser }) => {
   page = await browser.newPage();
   await page.goto('/');
@@ -50,6 +77,8 @@ test.afterAll(async () => {
 
 test.beforeEach(async () => {
   await reset();
+  // Laisse passer la fenêtre de 600 ms entre deux cas.
+  await page.waitForTimeout(650);
 });
 
 test.describe('vignettes', () => {
@@ -65,5 +94,92 @@ test.describe('vignettes', () => {
     expect(centre![0]).toBeGreaterThan(240);
     expect(centre![1]).toBeLessThan(15);
     expect(centre![2]).toBeLessThan(15);
+  });
+});
+
+test.describe('opacité au clavier', () => {
+  test('un chiffre règle l’opacité', async () => {
+    await press('5', 'Digit5');
+    expect((await state()).opacity).toBeCloseTo(0.5);
+  });
+
+  test('deux chiffres rapides donnent un pourcentage précis', async () => {
+    await press('5', 'Digit5');
+    await press('5', 'Digit5');
+    expect((await state()).opacity).toBeCloseTo(0.55);
+  });
+
+  test('zéro vaut 100 %', async () => {
+    await press('3', 'Digit3');
+    await page.waitForTimeout(650);
+    await press('0', 'Digit0');
+    expect((await state()).opacity).toBeCloseTo(1);
+  });
+
+  test('AZERTY : la touche marquée 5 produit « ( » et doit quand même marcher', async () => {
+    await press('(', 'Digit5');
+    expect((await state()).opacity).toBeCloseTo(0.5);
+  });
+
+  test('le pavé numérique marche aussi', async () => {
+    await press('7', 'Numpad7');
+    expect((await state()).opacity).toBeCloseTo(0.7);
+  });
+
+  test('un chiffre tapé dans un champ de texte ne touche pas l’opacité', async () => {
+    await page.getByRole('textbox', { name: 'X', exact: true }).focus();
+    await page.keyboard.press('5');
+    expect((await state()).opacity).toBe(1);
+    await page.getByRole('textbox', { name: 'X', exact: true }).blur();
+  });
+
+  /**
+   * Le champ X bloque déjà la propagation de ses touches : le test précédent
+   * passerait même sans la garde. Celui-ci l'isole, avec un champ ordinaire qui
+   * laisse l'événement remonter jusqu'à `window`.
+   */
+  test('la garde protège un champ de texte qui ne bloque rien', async () => {
+    await page.evaluate(() => {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'temoin-texte';
+      document.body.appendChild(input);
+    });
+    await page.locator('#temoin-texte').focus();
+    await page.keyboard.press('5');
+    expect((await state()).opacity).toBe(1);
+    await page.evaluate(() => document.getElementById('temoin-texte')?.remove());
+  });
+
+  test('avec une case à cocher sous le focus, le raccourci marche toujours', async () => {
+    await page.getByLabel('Sélection auto', { exact: true }).focus();
+    // Au clavier réel : l'événement doit partir de la case qui a le focus,
+    // sinon ce test passerait même si l'exception était cassée.
+    await page.keyboard.press('4');
+    expect((await state()).opacity).toBeCloseTo(0.4);
+  });
+});
+
+test.describe('mode de fusion au clavier', () => {
+  test('Maj + avance d’un mode', async () => {
+    await press('+', 'Equal', true);
+    expect((await state()).blendMode).toBe('multiply');
+  });
+
+  test('Maj − recule, en boucle jusqu’au dernier mode', async () => {
+    await press('_', 'Minus', true);
+    expect((await state()).blendMode).toBe('luminosity');
+  });
+
+  test('le pavé numérique avance et recule', async () => {
+    await press('+', 'NumpadAdd');
+    expect((await state()).blendMode).toBe('multiply');
+    await press('-', 'NumpadSubtract');
+    expect((await state()).blendMode).toBe('normal');
+  });
+
+  test('un « + » sans Maj ne change rien', async () => {
+    await press('=', 'Equal', false);
+    expect((await state()).blendMode).toBe('normal');
   });
 });

@@ -5,4 +5,5 @@ export * from './layerOps.js';
 export * from './assets.js';
 export * from './store.js';
 export * from './tool.js';
+export * from './shortcuts.js';
 export * from './viewport.js';

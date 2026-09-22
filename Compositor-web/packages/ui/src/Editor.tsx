@@ -19,6 +19,7 @@ import { CanvasView } from './CanvasView.js';
 import { LayerList } from './LayerList.js';
 import { ToolRail } from './ToolRail.js';
 import { ToolHeader } from './ToolHeader.js';
+import { useAppearanceShortcuts } from './useAppearanceShortcuts.js';
 import { createMoveTool } from './tools/moveTool.js';
 
 /**
@@ -28,7 +29,7 @@ import { createMoveTool } from './tools/moveTool.js';
  */
 const TOOL_HINTS: Partial<Record<ToolId, string>> = {
   move:
-    'Glisser pour déplacer · Poignée pour redimensionner · Maj inverse le verrouillage du ratio · Molette pour déplacer la vue · Ctrl-molette pour zoomer',
+    'Glisser pour déplacer · Poignée pour redimensionner · 1–0 opacité · Maj +/− mode · Molette pour déplacer la vue · Ctrl-molette pour zoomer',
   idle: 'Aucun outil actif',
 };
 
@@ -41,6 +42,7 @@ export const Editor = (): React.ReactElement => {
   const viewport = useStore(uiStore, (s) => s.viewport);
   const document = useStore(documentStore, (s) => s.document);
   const compositorRef = useRef<Compositor | null>(null);
+  useAppearanceShortcuts();
   const [message, setMessage] = useState<string | null>(null);
   const [isDropTarget, setIsDropTarget] = useState(false);
 
