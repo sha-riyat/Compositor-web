@@ -6,16 +6,30 @@ import {
   createDocument,
   createLayer,
   documentStore,
+  isDocumentOpaque,
   identityTransform,
   uiStore,
   type CompositorDocument,
+  type ToolId,
 } from '@compositor/model';
 import { decodeImageFile, exportDocumentPNG, firstImageFile, ImportError } from '@compositor/io';
 import type { Compositor } from '@compositor/renderer';
 import { CanvasView } from './CanvasView.js';
 import { LayerList } from './LayerList.js';
 import { ToolRail } from './ToolRail.js';
+import { ToolHeader } from './ToolHeader.js';
 import { createMoveTool } from './tools/moveTool.js';
+
+/**
+ * L'aide contextuelle de la barre d'état, reprise de l'application macOS : elle
+ * rappelle en permanence ce que l'outil courant sait faire, plutôt que de
+ * l'enfouir dans une documentation. Elle change avec l'outil.
+ */
+const TOOL_HINTS: Partial<Record<ToolId, string>> = {
+  move:
+    'Glisser pour déplacer · Poignée pour redimensionner · Maj inverse le verrouillage du ratio · Molette pour déplacer la vue · Ctrl-molette pour zoomer',
+  idle: 'Aucun outil actif',
+};
 
 /**
  * La coque de l'éditeur. Elle tient le glisser-déposer, l'export et la barre
@@ -37,7 +51,7 @@ export const Editor = (): React.ReactElement => {
         handleTolerance: () => 6 / uiStore.getState().viewport.scale,
         autoSelect: () => uiStore.getState().autoSelect,
         transformBoxVisible: () => uiStore.getState().showsTransformBox,
-        lockRatioByDefault: () => true,
+        lockRatioByDefault: () => uiStore.getState().locksTransformRatio,
       }),
     [],
   );
@@ -98,6 +112,11 @@ export const Editor = (): React.ReactElement => {
     }
   }, []);
 
+  const colourSpaceLabel =
+    document === null || isDocumentOpaque(document, documentStore.getState().assets)
+      ? 'sRGB'
+      : 'sRGB · Transparent';
+
   return (
     <div
       className="flex h-full w-full flex-col bg-(--color-canvas) text-(--color-fg)"
@@ -125,6 +144,8 @@ export const Editor = (): React.ReactElement => {
           Exporter en PNG
         </Button>
       </header>
+
+      <ToolHeader />
 
       <div className="flex min-h-0 flex-1">
         <ToolRail tool={tool} onToolChange={(next) => uiStore.setState({ tool: next })} />
@@ -161,17 +182,31 @@ export const Editor = (): React.ReactElement => {
       </div>
 
       <footer className="flex h-control-lg shrink-0 items-center gap-3 border-t border-(--color-border) bg-(--color-panel) px-2 text-ui text-(--color-fg-muted)">
+        <span className="numeric">{formatZoom(viewport.scale)}</span>
         {document !== null && (
           <span className="numeric">
-            {document.width} × {document.height} px · {document.resolution} ppp
+            {formatPixels(document.width)} × {formatPixels(document.height)} px ·{' '}
+            {document.resolution} ppp
           </span>
         )}
-        <span className="numeric">{Math.round(viewport.scale * 100)} %</span>
+        <span>{colourSpaceLabel}</span>
         {message !== null && <span className="text-(--color-fg)">{message}</span>}
+        <div className="flex-1" />
+        <span className="truncate text-(--color-fg-faint)">{TOOL_HINTS[tool] ?? ''}</span>
       </footer>
     </div>
   );
 };
+
+/** Une décimale au plus, sans zéro inutile — `133,5 %`, `100 %`. */
+const formatZoom = (scale: number): string => {
+  const percent = scale * 100;
+  const rounded = Math.round(percent * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1).replace('.', ',')} %`;
+};
+
+/** Séparateur de milliers, comme dans la barre d'état de l'original. */
+const formatPixels = (value: number): string => value.toLocaleString('fr-FR');
 
 /** Cadre le document dans la vue à l'ouverture, comme le fait le Swift. */
 const fitToView = (document: CompositorDocument): void => {
