@@ -2,6 +2,8 @@ export * from './Editor.js';
 export * from './CanvasView.js';
 export * from './LayerList.js';
 export * from './LayerRow.js';
+export * from './LayerThumbnail.js';
+export * from './thumbnail.js';
 export * from './LayerAppearance.js';
 export * from './blendPreview.js';
 export * from './ToolRail.js';

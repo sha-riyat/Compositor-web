@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Eye, EyeSlash } from '@phosphor-icons/react';
 import type { Layer } from '@compositor/model';
+import { LayerThumbnail } from './LayerThumbnail.js';
 
 /**
  * Une ligne du panneau de calques — 52 px de haut, comme
@@ -83,10 +84,7 @@ export const LayerRow = ({
         {layer.isVisible ? <Eye size={14} /> : <EyeSlash size={14} />}
       </button>
 
-      <span
-        aria-hidden
-        className="h-[36px] w-[36px] shrink-0 rounded-sm border border-(--color-border) bg-(--color-panel-sunken)"
-      />
+      <LayerThumbnail layer={layer} />
 
       {isRenaming ? (
         <input
