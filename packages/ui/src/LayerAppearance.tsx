@@ -27,7 +27,10 @@ export const LayerAppearance = (): React.ReactElement | null => {
       ? undefined
       : document.layers.find((l) => l.id === activeLayerId);
 
-  if (layer === undefined) return null;
+  // Le bloc reste monté même sans calque actif, désactivé. Sinon la liste
+  // sauterait de 56 px sous le pointeur au moment où l'on sélectionne — ce qui
+  // se voit surtout quand on enchaîne sélection et glissement.
+  if (layer === undefined) return <Placeholder />;
 
   // `typeof layer` porterait le type déclaré, pas celui affiné par la garde.
   const active: Layer = layer;
@@ -74,8 +77,8 @@ export const LayerAppearance = (): React.ReactElement | null => {
                   onHoverStart={() => setBlendPreview({ layerId: active.id, mode })}
                   className={[
                     'flex h-control cursor-default items-center rounded-sm px-1_5 text-ui outline-none',
-                    'data-hovered:bg-(--color-accent) data-hovered:text-(--color-accent-fg)',
-                    'data-focused:bg-(--color-accent) data-focused:text-(--color-accent-fg)',
+                    'data-hovered:bg-(--color-selection) data-hovered:text-(--color-accent-fg)',
+                    'data-focused:bg-(--color-selection) data-focused:text-(--color-accent-fg)',
                     mode === active.blendMode ? 'font-medium' : '',
                   ].join(' ')}
                 >
@@ -118,3 +121,23 @@ export const LayerAppearance = (): React.ReactElement | null => {
     </div>
   );
 };
+
+/** La même hauteur, sans calque à régler. */
+const Placeholder = (): React.ReactElement => (
+  <div
+    aria-hidden
+    className="flex shrink-0 flex-col gap-1_5 border-b border-(--color-border) px-2 py-2 opacity-35"
+  >
+    <div className="flex items-center gap-2">
+      <span className="w-[42px] shrink-0 text-(--color-fg-muted)">Mode</span>
+      <div className="h-control flex-1 rounded-sm border border-(--color-border) bg-(--color-panel-sunken)" />
+    </div>
+    <div className="flex items-center gap-2">
+      <span className="w-[42px] shrink-0 text-(--color-fg-muted)">Opacité</span>
+      <div className="relative h-control flex-1">
+        <div className="absolute top-1/2 h-[3px] w-full -translate-y-1/2 rounded-sm bg-(--color-panel-sunken)" />
+      </div>
+      <span className="numeric w-[36px] shrink-0 text-right text-(--color-fg-muted)">— %</span>
+    </div>
+  </div>
+);
