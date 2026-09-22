@@ -1,0 +1,13 @@
+@import 'tailwindcss';
+
+/*
+ * Les composants vivent dans `packages/ui`, atteints par un lien symbolique
+ * dans `node_modules` — que la détection automatique de Tailwind ignore, comme
+ * toute dépendance. Il faut donc désigner les sources explicitement, sans quoi
+ * aucune classe de ces fichiers n'est générée.
+ */
+@source '../../../packages/ui/src';
+
+@import './styles/fonts.css';
+@import './styles/tokens.css';
+@import './styles/base.css';
