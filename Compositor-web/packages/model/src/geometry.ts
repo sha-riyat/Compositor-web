@@ -1,6 +1,6 @@
 /**
  * Géométrie du document, en coordonnées « coin supérieur gauche », comme
- * `Compositor/Compositor/Document/LayerTransform.swift`.
+ * `Compositor/Document/LayerTransform.swift`.
  */
 
 export interface Point {

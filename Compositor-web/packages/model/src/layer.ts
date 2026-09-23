@@ -6,7 +6,7 @@ export type LayerId = string;
 export type AssetId = string;
 
 /**
- * Les quatorze modes de `Compositor/Compositor/Document/LayerAppearance.swift`.
+ * Les quatorze modes de `Compositor/Document/LayerAppearance.swift`.
  * Les quatre derniers ne sont pas séparables par canal.
  */
 export const BLEND_MODES = [

@@ -4,7 +4,7 @@ import { handleAt, handleCursor, handlePosition, resizeTransform } from './moveT
 
 /**
  * Traduction de la partie « non destructif » de
- * `Compositor/CompositorTests/TransformTests.swift` : un redimensionnement
+ * `CompositorTests/TransformTests.swift` : un redimensionnement
  * écrit dans le placement, jamais dans les pixels.
  */
 

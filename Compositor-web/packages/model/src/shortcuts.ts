@@ -2,7 +2,7 @@ import { BLEND_MODES, type BlendMode } from './layer.js';
 
 /**
  * La logique des raccourcis d'apparence, reprise de
- * `Compositor/Compositor/Document/EditorSession+Brush.swift` et
+ * `Compositor/Document/EditorSession+Brush.swift` et
  * `LayerAppearance.swift`. Fonctions pures : l'écoute du clavier vit dans
  * l'interface, la règle vit ici et se teste en Node.
  */

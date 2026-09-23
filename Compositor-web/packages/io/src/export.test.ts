@@ -3,7 +3,7 @@ import { premultiply, unpremultiply } from './alpha.js';
 import { withResolution } from './export.js';
 
 /**
- * Traduction partielle de `Compositor/CompositorTests/ExportTests.swift`.
+ * Traduction partielle de `CompositorTests/ExportTests.swift`.
  *
  * Ce qui traverse vers Node : la conversion prémultiplié → alpha droit et le
  * morceau `pHYs` de résolution. Ce qui ne traverse pas — dimensions, ordre,

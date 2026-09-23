@@ -14,7 +14,7 @@ import { BLEND_MODES, type BlendMode } from '@compositor/model';
  *
  * Le premier terme, `(1−αb)·αs·Cs`, est celui que Core Graphics laisse tomber
  * pour Color Dodge et Color Burn : une brosse douce y sort avec un bord dur.
- * `Compositor/Compositor/Rendering/SeparableBlend.swift` contourne le défaut en
+ * `Compositor/Rendering/SeparableBlend.swift` contourne le défaut en
  * refaisant ces deux modes via Core Image, sur tout le canevas.
  *
  * En écrivant la formule complète, ce contournement n'existe pas — et le

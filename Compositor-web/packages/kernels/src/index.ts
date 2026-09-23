@@ -1,5 +1,5 @@
 /**
- * Les huit noyaux pixel en C de `Compositor/Compositor/Rendering/*.c`, compilés
+ * Les huit noyaux pixel en C de `Compositor/Rendering/*.c`, compilés
  * en WebAssembly par Emscripten.
  *
  * 778 lignes sans dépendance Apple, opérant sur du RGBA prémultiplié — elles se
