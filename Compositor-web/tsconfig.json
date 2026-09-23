@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/model" },
+    { "path": "./packages/kernels" },
+    { "path": "./packages/renderer" },
+    { "path": "./packages/io" },
+    { "path": "./packages/ui" },
+    { "path": "./apps/editor" }
+  ]
+}

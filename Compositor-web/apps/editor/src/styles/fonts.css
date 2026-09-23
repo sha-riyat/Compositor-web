@@ -1,0 +1,20 @@
+/* --------------------------------------------------------------------------
+   Geist — auto-hébergée. Sous COEP `require-corp`, une police servie par un
+   tiers (Google Fonts, un CDN) est bloquée : ce n'est pas une préférence.
+   -------------------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/GeistVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMonoVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
