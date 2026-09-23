@@ -3,7 +3,7 @@ import { transformContains } from './geometry.js';
 import type { AssetStore } from './assets.js';
 
 /**
- * Limites reprises de `Compositor/docs/project-format.md`. Celle des côtés est
+ * Limites reprises de `docs/project-format.md`. Celle des côtés est
  * volontairement abaissée en T1 : le compositeur n'est pas encore pavé, donc
  * une texture ne peut pas dépasser ce qu'une carte accepte. Elle remontera à
  * 30 000 en T4.

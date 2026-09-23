@@ -1,0 +1,10 @@
+# Chaîne d'outils web
+node_modules/
+dist/
+dist-types/
+*.tsbuildinfo
+.vite/
+
+# Playwright
+test-results/
+playwright-report/

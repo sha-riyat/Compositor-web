@@ -16,7 +16,7 @@ import {
 import type { CompositorDocument } from './document.js';
 
 /**
- * Traduction de la partie de `Compositor/CompositorTests/LayerTests.swift` qui
+ * Traduction de la partie de `CompositorTests/LayerTests.swift` qui
  * porte sur l'ordre et les opérations de pile.
  */
 

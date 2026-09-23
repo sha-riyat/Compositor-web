@@ -1,0 +1,6 @@
+# Outillage d'agent — hors du dépôt du projet.
+# `launch.json` fait exception : il configure le serveur de développement,
+# pas un agent.
+*
+!.gitignore
+!launch.json

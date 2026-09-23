@@ -12,7 +12,7 @@ import type { CompositorDocument } from '@compositor/model';
  *
  * Cette seconde règle n'est pas un détail : sans elle, sélectionner un calque
  * ou le cliquer sans le bouger détruirait le rétablissement. Voir
- * `Compositor/Compositor/Document/DocumentHistory.swift`.
+ * `Compositor/Document/DocumentHistory.swift`.
  *
  * En T3, `#commit` remplira une pile d'instantanés à partage structurel
  * (100 entrées, 256 Mio retenus) — le reste de cette classe ne bougera pas.

@@ -8,7 +8,7 @@ import type { ToolId } from './store.js';
  * WebGL ni les stores directement.
  *
  * C'est ce qui rendra portables les 54 fichiers de tests de
- * `Compositor/CompositorTests/` : ils pilotent cette interface, pas l'interface
+ * `CompositorTests/` : ils pilotent cette interface, pas l'interface
  * graphique. C'est aussi la raison pour laquelle sa signature est figée en T1 —
  * la changer ensuite toucherait les seize outils.
  */

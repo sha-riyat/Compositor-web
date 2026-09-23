@@ -68,7 +68,7 @@ textarea,
 
 /* Le canevas dessine son propre curseur (cercle de brosse, réticule du tampon,
    aperçu) : les curseurs CSS plafonnent à 128 px sur Chrome et ignorent la
-   densité de l'écran. Voir `Compositor/Compositor/Rendering/BrushCursorOverlay.swift`. */
+   densité de l'écran. Voir `Compositor/Rendering/BrushCursorOverlay.swift`. */
 canvas {
   display: block;
   touch-action: none;

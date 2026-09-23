@@ -1,10 +1,12 @@
 # Compositor Web
 
-Le portage web de Compositor. Voir le [README du dépôt](../README.md) pour la vue d'ensemble.
+Le portage web de [Compositor](../README.md), l'éditeur d'images macOS dont ce dépôt est un fork.
 
 L'objectif est un éditeur complet qui tourne dans le navigateur : calques, masques, groupes, sélections, brosse, réglages et effets, avec une fidélité suffisante pour qu'un fichier passe d'une version à l'autre sans perte.
 
-L'application macOS d'origine est conservée dans [`../Compositor/`](../Compositor/) comme **spécification en lecture seule** — modèle de document, format `.comp`, noyaux pixel en C et 54 fichiers de tests qui décrivent le comportement attendu.
+L'application macOS d'origine occupe la racine du dépôt, **exactement telle qu'en amont** : [`Compositor/`](../Compositor/), [`CompositorTests/`](../CompositorTests/), [`docs/`](../docs/)… Elle sert de **spécification en lecture seule** — modèle de document, format `.comp`, noyaux pixel en C et 54 fichiers de tests qui décrivent le comportement attendu.
+
+Tout le travail web vit dans ce dossier, et nulle part ailleurs. C'est ce qui permet de récupérer les nouveaux commits du dépôt d'origine sans conflit : hors de `Compositor-web/` et `.claude/`, aucun fichier ne diffère de l'amont.
 
 ## État
 

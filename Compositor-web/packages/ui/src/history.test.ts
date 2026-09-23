@@ -3,7 +3,7 @@ import { createDocument, addLayer, createLayer, identityTransform } from '@compo
 import { TransactionLog } from './history.js';
 
 /**
- * Traduction de la partie de `Compositor/CompositorTests/HistoryTests.swift`
+ * Traduction de la partie de `CompositorTests/HistoryTests.swift`
  * qui porte sur le **contrat** des transactions — ce que T1 implémente.
  *
  * La pile d'annulation elle-même est un no-go du pari et arrive en T3 ; les

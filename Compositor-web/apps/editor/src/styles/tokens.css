@@ -1,7 +1,7 @@
 /* --------------------------------------------------------------------------
    L'échelle par défaut de Tailwind est celle d'un site web : texte 16 px,
    contrôles 40 px, espacements par 4. Elle est ici remplacée — pas étendue —
-   par les métriques relevées dans `Compositor/Compositor/UI/`.
+   par les métriques relevées dans `Compositor/UI/`.
 
    `--spacing: initial` purge l'échelle d'origine, pour que `p-4` (16 px chez
    Tailwind) ne puisse pas se glisser là où il fallait 8.

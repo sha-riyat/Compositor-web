@@ -4,7 +4,7 @@
  * **Invariant ①** — on compose en sRGB **non linéaire**, comme Photoshop. Le
  * format interne est donc `RGBA8` et jamais `SRGB8_ALPHA8`, qui décoderait vers
  * le linéaire à l'échantillonnage. Voir le commentaire de
- * `Compositor/Compositor/Rendering/SeparableBlend.swift` : en linéaire, un gris
+ * `Compositor/Rendering/SeparableBlend.swift` : en linéaire, un gris
  * 80 % esquive vers 62 % au lieu de 100 %.
  *
  * **Invariant ②** — alpha prémultiplié partout.
