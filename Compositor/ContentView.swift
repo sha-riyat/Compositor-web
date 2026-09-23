@@ -171,19 +171,26 @@ struct ContentView: View {
             // Absorb all remaining navigation-toolbar width before the zoom controls.
             // Without this spacer, the growing tab strip pushes the primary actions left.
             ToolbarSpacer(.flexible, placement: .navigation)
-            ToolbarItemGroup(placement: .primaryAction) {
+            ToolbarItem(placement: .primaryAction) {
                 Button("Fit") { session.fit() }.help("Fit canvas in window (⌘0)")
                     .accessibilityIdentifier("fitCanvas").disabled(session.document == nil)
+                    .padding(.horizontal, 4)
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button("100%") { session.zoom(to: 1) }.help("Actual pixels (⌘1)")
                     .accessibilityIdentifier("actualPixels").disabled(session.document == nil)
+                    .padding(.horizontal, 4)
             }
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button { session.zoom(to: session.viewport.zoom * 1.25) } label: {
-                    Image(systemName: "plus.magnifyingglass")
-                }.help("Zoom in (⌘+)").disabled(session.document == nil)
-                Button { session.zoom(to: session.viewport.zoom / 1.25) } label: {
-                    Image(systemName: "minus.magnifyingglass")
-                }.help("Zoom out (⌘−)").disabled(session.document == nil)
+            ToolbarItem(placement: .primaryAction) {
+                HStack(spacing: 0) {
+                    Button { session.zoomKeyboard(by: 1) } label: {
+                        Image(systemName: "plus.magnifyingglass")
+                    }.help("Zoom in (⌘+)").disabled(session.document == nil)
+                    Button { session.zoomKeyboard(by: -1) } label: {
+                        Image(systemName: "minus.magnifyingglass")
+                    }.help("Zoom out (⌘−)").disabled(session.document == nil)
+                }
+                .padding(.horizontal, 4)
             }
         }
     }
@@ -229,7 +236,9 @@ struct ContentView: View {
             if closed { filterPanel.close() }
             else {
                 filterPanel.onClose = { session.cancelFilter() }
-                filterPanel.show(title: session.filterEdit?.kind.rawValue ?? "Filter", content: FilterSheet(session: session))
+                let placement: FloatingPanelPlacement = session.filterEdit?.kind == .cameraRaw ? .dockedToMainWindowRight : .automatic
+                filterPanel.show(title: session.filterEdit?.kind.rawValue ?? "Filter", content: FilterSheet(session: session),
+                                 placement: placement)
             }
         }
         .onChange(of: session.document == nil) { _, empty in
@@ -262,7 +271,7 @@ struct ContentView: View {
     }
     private var toolRail: some View {
         // Scrolls when the window is too short for every tool, rather than pushing the bars above and below away.
-        ScrollView(.vertical) {
+        IndicatorlessScrollView {
         VStack(spacing: 10) {
             ForEach(NavigationTool.allCases.filter { $0 != .idle }, id: \.self) { tool in
                 Button { session.selectTool(tool) } label: {
@@ -290,10 +299,8 @@ struct ContentView: View {
             ColorPaletteControls(session: session).padding(.top, 8)
         }
         .padding(.top, 16).padding(.bottom, 12)
+        .frame(width: 56)
         }
-        .scrollIndicators(.hidden)
-        // Only scrolls (and bounces) when the tools don't all fit.
-        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         .frame(width: 56)
     }
     private var welcome: some View {

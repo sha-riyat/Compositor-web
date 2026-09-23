@@ -246,6 +246,7 @@ final class EditorSession {
     @ObservationIgnored var selectionMoveOrigin: DocumentSelection?
     var pixelMove: PixelMove?
     @ObservationIgnored var pixelClipboard: PixelClipboard?
+    @ObservationIgnored var copiedLayer: CopiedLayer?
     var levels: LevelsEdit? { didSet { resumeFileRequests() } }
     var hueSaturation: HueSaturationEdit?
     /// The open filter (Filter menu), and the settings the next one starts from.
@@ -346,7 +347,14 @@ final class EditorSession {
         if value.isBrushTool { _ = MetalBrushCoverage.shared }
         if value == .crop, cropRect == nil, let document {
             cropRatioChoice = "Free"
-            cropRect = CGRect(origin: .zero, size: document.size)
+            let canvas = CGRect(origin: .zero, size: document.size)
+            // With a selection, the crop starts at its bounds, as Photoshop's does: C, then Return, crops to it.
+            if let selection, !selection.isEmpty {
+                let bounds = selection.path.boundingBoxOfPath.integral.intersection(canvas)
+                cropRect = CropGeometry.valid(bounds) ? bounds : canvas
+            } else {
+                cropRect = canvas
+            }
         }
     }
     /// Tab steps the current tool through its own modes — the setting sitting at the left of its tool bar. Tools
@@ -403,15 +411,12 @@ final class EditorSession {
         let targets = (document?.layers ?? []).filter { selection.contains($0.id) && !carried.contains($0.id) }.map(\.id)
         guard !targets.isEmpty else { return }
         beginEdit(targets.count > 1 ? "Duplicate Layers" : "Duplicate Layer")
-        var copies: [UUID] = []
-        for id in targets {
-            selectLayer(id)
-            duplicateActiveLayer()
-            if let copy = activeLayerID, copy != id { copies.append(copy) }
-        }
+        // Stacked as Duplicate Layer stacks them: several together above the topmost original.
+        duplicateLayers(targets)
+        let copies = selectedLayerIDs.subtracting(selection)
         guard !copies.isEmpty else { endEdit(); selectLayers(selection, primary: primary); return }
-        transformDuplicate = (copies, selection, primary)
-        selectLayers(Set(copies), primary: copies.last)
+        transformDuplicate = (Array(copies), selection, primary)
+        selectLayers(copies, primary: activeLayerID)
         beginTransform(persistent: false)
     }
     func commitTransform() {
@@ -518,6 +523,31 @@ final class EditorSession {
     var conversionRequest: PSDConversionRequest?
     /// Tests assign this to skip the conversion sheet.
     @ObservationIgnored var confirmConversions: (([PSDConversion]) async -> Bool)?
+    /// The RAW file being developed, and the settings the sheet is editing (see RawImporter).
+    var rawDevelop: (url: URL, settings: RawDevelopSettings)?
+    var showsRawDevelop = false { didSet { resumeFileRequests() } }
+    @ObservationIgnored private var rawContinuation: CheckedContinuation<RawDevelopSettings?, Never>?
+    /// Tests assign this to develop without a sheet.
+    @ObservationIgnored var confirmRawDevelop: ((URL, RawDevelopSettings) async -> RawDevelopSettings?)?
+
+    /// Puts the develop sheet up and waits for the choice; nil means the import was cancelled.
+    func developRaw(_ url: URL) async -> RawDevelopSettings? {
+        let asShot = RawImporter.asShot(url) ?? RawDevelopSettings()
+        if let confirmRawDevelop { return await confirmRawDevelop(url, asShot) }
+        return await withCheckedContinuation { continuation in
+            rawContinuation = continuation
+            rawDevelop = (url, asShot)
+            showsRawDevelop = true
+        }
+    }
+    func finishRawDevelop(_ settings: RawDevelopSettings?) {
+        showsRawDevelop = false
+        rawDevelop = nil
+        Task { await RawImporter.Queue.shared.release() }
+        let continuation = rawContinuation
+        rawContinuation = nil
+        continuation?.resume(returning: settings)
+    }
     @ObservationIgnored private var conversionContinuation: CheckedContinuation<Bool, Never>?
     /// Cancel pressed while a Photoshop file was still being read.
     @ObservationIgnored private var conversionCancelled = false
@@ -725,7 +755,18 @@ final class EditorSession {
                     guard let image = layer.asset?.image else { return total }
                     return total + image.width * image.height
                 } ?? 0
-                if PSDReader.matches(url) {
+                if RawImporter.matches(url) {
+                    guard let size = RawImporter.pixelSize(url) else { throw ImageImportError.unreadable }
+                    guard size.width <= 30_000, size.height <= 30_000,
+                          size.width * size.height <= 100_000_000 - usedPixels else { throw ImageImportError.tooLarge }
+                    guard let settings = await developRaw(url) else { continue }
+                    // Seconds of work: off the main actor, or pressing Import freezes the window.
+                    guard let developed = await RawImporter.Queue.shared.develop(url, settings: settings, limit: nil)
+                    else { throw ImageImportError.unreadable }
+                    let thumbnail = try PixelAdjust.thumbnail(of: developed)
+                    insert(ImportedImage(image: developed, thumbnail: thumbnail,
+                                         name: url.deletingPathExtension().lastPathComponent), centeredAt: point)
+                } else if PSDReader.matches(url) {
                     beginPSDReading(title: "Open “\(url.lastPathComponent)”?", confirmTitle: "Import")
                     let imported: PSDImport
                     do {
@@ -877,5 +918,13 @@ final class EditorSession {
     func zoom(to value: CGFloat, anchor: CGPoint? = nil) {
         guard let document else { return }
         viewport.setZoom(value, anchoredAt: anchor ?? viewport.center, documentSize: document.size)
+    }
+
+    /// Step through stable keyboard zoom levels while keeping the viewport center fixed.
+    func zoomKeyboard(by step: Int) {
+        guard let document, step != 0 else { return }
+        let target = viewport.keyboardZoomTarget(by: step)
+        guard target != viewport.zoom else { return }
+        viewport.setZoom(target, anchoredAt: viewport.center, documentSize: document.size)
     }
 }

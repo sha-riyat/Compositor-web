@@ -86,9 +86,15 @@ struct CompositorApp: App {
                     CommandGroup(after: .toolbar) {
                         Button("Fit Canvas") { session.fit() }.configuredKeyboardShortcut("0").disabled(session.document == nil)
                         Button("Actual Pixels") { session.zoom(to: 1) }.configuredKeyboardShortcut("1").disabled(session.document == nil)
-                        Button("Zoom In") { session.zoom(to: session.viewport.zoom * 1.25) }
+                        Button("Zoom In") {
+                            guard !(NSApp.keyWindow?.firstResponder is NSText) else { return }
+                            session.zoomKeyboard(by: 1)
+                        }
                             .configuredKeyboardShortcut("=").disabled(session.document == nil)
-                        Button("Zoom Out") { session.zoom(to: session.viewport.zoom / 1.25) }
+                        Button("Zoom Out") {
+                            guard !(NSApp.keyWindow?.firstResponder is NSText) else { return }
+                            session.zoomKeyboard(by: -1)
+                        }
                             .configuredKeyboardShortcut("-").disabled(session.document == nil)
                         Toggle("Pixel Grid (800% and above)", isOn: Binding(get: { session.showsPixelGrid },
                                                                               set: { session.showsPixelGrid = $0 }))
@@ -150,7 +156,7 @@ struct CompositorApp: App {
                         .configuredKeyboardShortcut("x")
                     Button("Copy") {
                         if NSApp.keyWindow?.firstResponder is NSTextView { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }
-                        else if session.canCopyPixels { session.copySelection() }
+                        else if session.canCopyPixels || session.canCopyLayer { session.copySelection() }
                         else { NSSound.beep() }
                     }
                         .configuredKeyboardShortcut("c")
@@ -158,6 +164,7 @@ struct CompositorApp: App {
                         .configuredKeyboardShortcut("c", modifiers: [.command, .shift]).disabled(!session.canCopyMerged)
                     Button("Paste") {
                         if NSApp.keyWindow?.firstResponder is NSTextView { NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil) }
+                        else if applicationDelegate.workspace.pasteCopiedLayer() { }
                         else if session.canPaste { session.paste() }
                         else { NSSound.beep() }
                     }
@@ -228,7 +235,7 @@ struct CompositorApp: App {
                         .configuredKeyboardShortcut("l").disabled(!session.canAdjustColors || session.hueSaturation != nil)
                     Button("Hue/Saturation…") { session.beginHueSaturation() }
                         .configuredKeyboardShortcut("u").disabled(!session.canAdjustColors)
-                    ForEach([FilterKind.exposure, .gradientMap, .grain], id: \.self) { kind in
+                    ForEach([FilterKind.blackWhite, .colorBalance, .exposure, .gradientMap, .grain], id: \.self) { kind in
                         Button("\(kind.rawValue)…") { session.beginFilter(kind) }
                             .disabled(!session.canAdjustColors || session.hueSaturation != nil)
                     }
@@ -242,6 +249,8 @@ struct CompositorApp: App {
                     Button("Image Size…") { Task { await applicationDelegate.projects.imageSize() } }
                         .configuredKeyboardShortcut("i", modifiers: [.command, .option])
                         .disabled(session.document == nil || !applicationDelegate.projects.canStart)
+                    Button("Trim…") { Task { await applicationDelegate.projects.trim() } }
+                        .disabled(session.document == nil || !applicationDelegate.projects.canStart)
                     Group {
                         Divider()
                         Button("Flip Canvas Horizontal") { session.flipCanvas(horizontally: true) }
@@ -253,13 +262,13 @@ struct CompositorApp: App {
                 CommandMenu("Filter") {
                     ForEach(FilterKind.allCases.filter { $0 != .contentAwareFill && !$0.isImageAdjustment }, id: \.self) { kind in
                         Button("\(kind.rawValue)…") { session.beginFilter(kind) }
-                            .disabled(!session.canAdjustColors || session.hueSaturation != nil)
+                            .disabled(!(kind == .vignette ? session.canVignette : session.canAdjustColors) || session.hueSaturation != nil)
                     }
                 }
                 CommandMenu("Layer") {
                     Menu("New Adjustment Layer") {
                         ForEach(AdjustmentKind.allCases, id: \.self) { kind in
-                            Button(kind.rawValue + "…") { session.addAdjustment(kind) }
+                            Button(kind.rawValue + (kind.isEditable ? "…" : "")) { session.addAdjustment(kind) }
                         }
                     }.disabled(!session.canEditLayers || session.document == nil)
                     Button("Edit Adjustment…") {
@@ -269,7 +278,7 @@ struct CompositorApp: App {
                     Button(session.canTransformSelection ? "Transform Selection" : "Transform Layer") { session.transformCommand() }
                         .configuredKeyboardShortcut("t").disabled(!session.canTransform && !session.canTransformSelection)
                     Button(session.selection == nil ? "Duplicate Layer" : "Layer via Copy") { session.layerViaCopy() }
-                        .configuredKeyboardShortcut("j").disabled(!session.canCopyPixels && !(session.selection == nil && session.canEditLayers && session.activeLayer?.isGroup == false))
+                        .configuredKeyboardShortcut("j").disabled(!session.canCopyPixels && !(session.selection == nil && session.canEditLayers && session.activeLayer != nil))
                     Divider()
                     Button(session.activeLayer?.maskSourceID == nil ? "Create Clipping Mask" : "Release Clipping Mask") {
                         if let id = session.activeLayerID { session.toggleClippingMask(id) }
