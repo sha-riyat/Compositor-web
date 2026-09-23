@@ -3,13 +3,13 @@
   <channel>
     <title>Compositor</title>
     <item>
-      <title>Version 1.2.0</title>
-      <pubDate>Mon, 21 Sep 2026 17:17:45 +0000</pubDate>
-      <sparkle:version>15</sparkle:version>
-      <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+      <title>Version 1.2.6</title>
+      <pubDate>Wed, 23 Sep 2026 05:53:18 +0000</pubDate>
+      <sparkle:version>21</sparkle:version>
+      <sparkle:shortVersionString>1.2.6</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.5</sparkle:minimumSystemVersion>
-      <link>https://github.com/robbietilton/Compositor/releases/tag/v1.2.0</link>
-      <enclosure url="https://github.com/robbietilton/Compositor/releases/download/v1.2.0/Compositor.dmg" sparkle:edSignature="VW1j/qU0g9mn2EQW+/fZvDMDAIh2Ub4H6jRLg0S4dViMYc9Hvxhfvsw1pHFxiTwhvIWn161BrjrocjcaFhr4Dw==" length="8211433" type="application/octet-stream"/>
+      <link>https://github.com/robbietilton/Compositor/releases/tag/v1.2.6</link>
+      <enclosure url="https://github.com/robbietilton/Compositor/releases/download/v1.2.6/Compositor.dmg" sparkle:edSignature="kAnVYSXzbw4Q9rRvtmqmRGCBPHO8BEhQ0GSGpK78xYdS9rQ/0UFuda12ca9AAlFcJ6LBASJ/KNqGKoDP/djZCQ==" length="8747701" type="application/octet-stream"/>
     </item>
   </channel>
 </rss>
