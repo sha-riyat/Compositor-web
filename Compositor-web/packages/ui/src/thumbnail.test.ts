@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { PixelBuffer } from '@compositor/model';
-import { renderThumbnail } from './thumbnail.js';
+import { fittedSize, renderThumbnail } from './thumbnail.js';
 
 /**
  * Traduction de la partie calculable de `CanvasThumbnailTests.swift`, et
@@ -77,5 +77,24 @@ describe('pas de liseré sombre aux bords transparents', () => {
     expect(b).toBe(0);
     expect(a).toBeGreaterThan(120);
     expect(a).toBeLessThan(135);
+  });
+});
+
+/** Traduction de `CanvasThumbnailTests.thumbnailsTakeTheCanvasShape`. */
+describe('la miniature prend la forme du canevas', () => {
+  test('un canevas en paysage donne une miniature en paysage', () => {
+    expect(fittedSize(400, 200, 36)).toEqual({ width: 36, height: 18 });
+  });
+
+  test('un canevas en portrait donne une miniature en portrait', () => {
+    expect(fittedSize(300, 600, 36)).toEqual({ width: 18, height: 36 });
+  });
+
+  test('un canevas sans taille donne le carré plein', () => {
+    expect(fittedSize(0, 0, 30)).toEqual({ width: 30, height: 30 });
+  });
+
+  test('un canevas très allongé garde au moins un point de haut', () => {
+    expect(fittedSize(10_000, 10, 36)).toEqual({ width: 36, height: 1 });
   });
 });

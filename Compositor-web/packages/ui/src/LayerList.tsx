@@ -215,6 +215,7 @@ export const LayerList = (): React.ReactElement => {
                     subtitle={subtitle(layer.id)}
                     isSelected={selectedLayerIds.includes(layer.id)}
                     isActive={layer.id === activeLayerId}
+                    isSoleSelection={selectedLayerIds.length === 1}
                     isRenaming={layer.id === renamingId}
                     isDragging={layer.id === draggingId}
                     onSelect={(event) => select(layer.id, event)}
