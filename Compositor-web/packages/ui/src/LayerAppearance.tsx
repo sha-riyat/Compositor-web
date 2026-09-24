@@ -23,6 +23,7 @@ import {
   type Layer,
 } from '@compositor/model';
 import { setBlendPreview } from './blendPreview.js';
+import { NumberField } from './NumberField.js';
 
 /**
  * Mode de fusion et opacité du calque actif.
@@ -116,34 +117,46 @@ export const LayerAppearance = (): React.ReactElement | null => {
         </MenuTrigger>
       </div>
 
-      <Slider
-        aria-label="Opacité"
-        value={Math.round(active.opacity * 100)}
-        minValue={0}
-        maxValue={100}
-        onChange={(value) => {
-          const next = (Array.isArray(value) ? value[0]! : value) / 100;
-          commit((l) => ({ ...l, opacity: next }));
-        }}
-        className="flex items-center gap-2"
-      >
-        <Label className="w-[42px] shrink-0 text-(--color-fg-muted)">Opacité</Label>
-        <SliderTrack className="relative h-control flex-1">
-          {({ state }) => (
-            <>
-              <div className="absolute top-1/2 h-[3px] w-full -translate-y-1/2 rounded-sm bg-(--color-panel-sunken)" />
-              <div
-                className="absolute top-1/2 h-[3px] -translate-y-1/2 rounded-sm bg-(--color-accent)"
-                style={{ width: `${state.getThumbPercent(0) * 100}%` }}
-              />
-              <SliderThumb className="top-1/2 h-[11px] w-[11px] rounded-full border border-(--color-border) bg-(--color-fg) data-dragging:bg-(--color-accent)" />
-            </>
-          )}
-        </SliderTrack>
-        <span className="numeric w-[36px] shrink-0 text-right text-(--color-fg-muted)">
-          {Math.round(active.opacity * 100)} %
-        </span>
-      </Slider>
+      <div className="flex items-center gap-1">
+        <Slider
+          aria-label="Opacité"
+          value={Math.round(active.opacity * 100)}
+          minValue={0}
+          maxValue={100}
+          onChange={(value) => {
+            const next = (Array.isArray(value) ? value[0]! : value) / 100;
+            commit((l) => ({ ...l, opacity: next }));
+          }}
+          className="flex flex-1 items-center gap-2"
+        >
+          <Label className="w-[42px] shrink-0 text-(--color-fg-muted)">Opacité</Label>
+          <SliderTrack className="relative h-control flex-1">
+            {({ state }) => (
+              <>
+                <div className="absolute top-1/2 h-[3px] w-full -translate-y-1/2 rounded-sm bg-(--color-panel-sunken)" />
+                <div
+                  className="absolute top-1/2 h-[3px] -translate-y-1/2 rounded-sm bg-(--color-accent)"
+                  style={{ width: `${state.getThumbPercent(0) * 100}%` }}
+                />
+                <SliderThumb className="top-1/2 h-[11px] w-[11px] rounded-full border border-(--color-border) bg-(--color-fg) data-dragging:bg-(--color-accent)" />
+              </>
+            )}
+          </SliderTrack>
+        </Slider>
+
+        {/* Le pourcentage se tape aussi, comme dans l'original : un champ de
+            44 px suivi de « % ». Il s'applique en quittant le champ. */}
+        <NumberField
+          label="Opacité en pourcentage"
+          hideLabel
+          value={Math.round(active.opacity * 100)}
+          min={0}
+          max={100}
+          unit="%"
+          widthClass="w-[44px]"
+          onChange={(percent) => commit((l) => ({ ...l, opacity: percent / 100 }))}
+        />
+      </div>
     </div>
   );
 };
@@ -158,12 +171,17 @@ const Placeholder = (): React.ReactElement => (
       <span className="w-[42px] shrink-0 text-(--color-fg-muted)">Mode</span>
       <div className="h-control flex-1 rounded-sm border border-(--color-border) bg-(--color-panel-sunken)" />
     </div>
-    <div className="flex items-center gap-2">
-      <span className="w-[42px] shrink-0 text-(--color-fg-muted)">Opacité</span>
-      <div className="relative h-control flex-1">
-        <div className="absolute top-1/2 h-[3px] w-full -translate-y-1/2 rounded-sm bg-(--color-panel-sunken)" />
+    {/* Même structure que la vraie ligne, pour que rien ne bouge d'un pixel
+        au moment où un calque est sélectionné. */}
+    <div className="flex items-center gap-1">
+      <div className="flex flex-1 items-center gap-2">
+        <span className="w-[42px] shrink-0 text-(--color-fg-muted)">Opacité</span>
+        <div className="relative h-control flex-1">
+          <div className="absolute top-1/2 h-[3px] w-full -translate-y-1/2 rounded-sm bg-(--color-panel-sunken)" />
+        </div>
       </div>
-      <span className="numeric w-[36px] shrink-0 text-right text-(--color-fg-muted)">— %</span>
+      <div className="h-control w-[44px] shrink-0 rounded-sm border border-(--color-border) bg-(--color-panel-sunken)" />
+      <span className="text-(--color-fg-muted)">%</span>
     </div>
   </div>
 );

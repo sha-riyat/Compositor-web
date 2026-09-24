@@ -1,105 +1,123 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { clamp, formatNumber, parseNumber, stepNumber } from './numericValue.js';
 
 /**
- * Un champ numérique d'en-tête d'outil.
+ * Le champ numérique de l'éditeur, repris de `TransformValueField`
+ * (`Compositor/UI/TransformInspector.swift`) et du champ de pourcentage de
+ * `LayerAppearanceControls.swift`.
  *
- * Il valide à la sortie du champ et à Entrée, abandonne à Échap, et avance aux
- * flèches — Maj pour aller par dix. C'est le minimum utilisable.
+ * - **Flèches** : un pas, dix avec Maj, depuis la valeur réelle (`ArrowStepper`).
+ * - **Entrée et Échap** rendent la main au canevas, pour que la touche d'un
+ *   outil marche aussitôt. Échap n'annule pas : dans l'original, il libère le
+ *   champ, ce qui applique la valeur (`onExitCommand { releaseFocus() }`).
+ * - Tant qu'il a le focus, le champ **ne se resynchronise pas** : il ne se bat
+ *   pas avec ce qu'on tape. Une flèche, elle, réécrit le nombre appliqué.
  *
- * **Ce n'est pas encore le composant définitif.** Il manque le scrub sur le
- * libellé, le réglage fin à Alt et la saisie d'expression. Celui-là servira
- * aussi aux Courbes, aux Niveaux et à la taille de brosse : il mérite d'être
- * écrit une fois pour toutes, pas ici à la hâte.
+ * Deux façons d'appliquer, comme dans l'original :
+ * - `applyWhileTyping` — chaque frappe qui forme un nombre s'applique tout de
+ *   suite (X, Y, L, H) ;
+ * - sinon, la valeur s'applique en quittant le champ (pourcentage d'opacité).
+ *
+ * Ce que l'original n'a pas, ce champ ne l'a pas non plus : ni glissement sur
+ * le libellé, ni saisie d'expression.
  */
-
 export interface NumberFieldProps {
   readonly label: string;
   readonly value: number;
-  readonly disabled?: boolean;
+  onChange(next: number): void;
   readonly min?: number;
   readonly max?: number;
+  readonly step?: number;
+  /** Affiché après le champ, hors de la valeur : `%`, `°`. */
   readonly unit?: string;
-  onChange(next: number): void;
+  readonly disabled?: boolean;
+  readonly applyWhileTyping?: boolean;
+  /** Le libellé n'est alors lu que par les technologies d'assistance. */
+  readonly hideLabel?: boolean;
+  /** Une classe de largeur Tailwind écrite en toutes lettres, `w-[44px]`. */
+  readonly widthClass?: string;
 }
 
 export const NumberField = ({
   label,
   value,
-  disabled = false,
+  onChange,
   min,
   max,
+  step,
   unit,
-  onChange,
+  disabled = false,
+  applyWhileTyping = false,
+  hideLabel = false,
+  widthClass = 'w-[54px]',
 }: NumberFieldProps): React.ReactElement => {
-  const [draft, setDraft] = useState(format(value));
-  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(formatNumber(value));
+  const [focused, setFocused] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
 
-  // Tant que le champ n'est pas en cours d'édition, il suit la valeur réelle —
-  // qui bouge aussi quand on fait glisser le calque sur le canevas.
+  // Hors édition, le champ suit la valeur réelle — qui bouge aussi quand on
+  // fait glisser le calque sur le canevas.
   useEffect(() => {
-    if (!editing) setDraft(format(value));
-  }, [value, editing]);
+    if (!focused) setDraft(formatNumber(value));
+  }, [value, focused]);
 
-  const commit = (text: string): void => {
-    const parsed = Number.parseFloat(text.replace(',', '.'));
-    if (!Number.isFinite(parsed)) {
-      setDraft(format(value));
-      return;
-    }
-    onChange(clamp(parsed, min, max));
+  const apply = (next: number): void => {
+    const bounded = clamp(next, min, max);
+    if (bounded !== value) onChange(bounded);
   };
 
-  const step = (delta: number): void => {
-    onChange(clamp(value + delta, min, max));
+  /** Quitter le champ applique ce qui a été tapé, ou rétablit la valeur. */
+  const release = (): void => {
+    const parsed = parseNumber(draft);
+    if (parsed !== null) apply(parsed);
+    setFocused(false);
   };
 
   return (
     <label className="flex shrink-0 items-center gap-1">
-      <span className="text-(--color-fg-muted)">{label}</span>
+      <span className={hideLabel ? 'sr-only' : 'text-(--color-fg-muted)'}>{label}</span>
       <input
+        ref={input}
         value={draft}
         disabled={disabled}
         inputMode="decimal"
+        onFocus={() => setFocused(true)}
         onChange={(event) => {
-          setEditing(true);
           setDraft(event.target.value);
-        }}
-        onBlur={() => {
-          setEditing(false);
-          commit(draft);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            setEditing(false);
-            commit(draft);
-            event.currentTarget.blur();
+          if (applyWhileTyping) {
+            const parsed = parseNumber(event.target.value);
+            if (parsed !== null) apply(parsed);
           }
-          if (event.key === 'Escape') {
-            setEditing(false);
-            setDraft(format(value));
-            event.currentTarget.blur();
+        }}
+        onBlur={release}
+        onKeyDown={(event) => {
+          // Les raccourcis globaux — chiffres pour l'opacité, Maj +/− pour le
+          // mode — ne doivent pas voir ce qui se tape ici.
+          event.stopPropagation();
+          if (event.key === 'Enter' || event.key === 'Escape') {
+            event.preventDefault();
+            input.current?.blur();
+            return;
           }
           if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             event.preventDefault();
-            const direction = event.key === 'ArrowUp' ? 1 : -1;
-            step(direction * (event.shiftKey ? 10 : 1));
+            const next = stepNumber(value, event.key === 'ArrowUp' ? 1 : -1, {
+              shift: event.shiftKey,
+              step,
+              min,
+              max,
+            });
+            apply(next);
+            setDraft(formatNumber(next));
           }
-          event.stopPropagation();
         }}
-        className="numeric h-control w-[54px] rounded-sm border border-(--color-border) bg-(--color-panel-sunken) px-1 text-right text-ui text-(--color-fg) outline-none focus:border-(--color-accent) disabled:opacity-40"
+        className={[
+          'numeric h-control rounded-sm border border-(--color-border) bg-(--color-panel-sunken) px-1',
+          'text-right text-ui text-(--color-fg) outline-none focus:border-(--color-accent) disabled:opacity-40',
+          widthClass,
+        ].join(' ')}
       />
       {unit !== undefined && <span className="text-(--color-fg-muted)">{unit}</span>}
     </label>
   );
-};
-
-/** Entier quand c'en est un, une décimale sinon — comme l'original. */
-const format = (value: number): string =>
-  Number.isInteger(value) ? String(value) : value.toFixed(1);
-
-const clamp = (value: number, min?: number, max?: number): number => {
-  let out = value;
-  if (min !== undefined) out = Math.max(min, out);
-  if (max !== undefined) out = Math.min(max, out);
-  return out;
 };

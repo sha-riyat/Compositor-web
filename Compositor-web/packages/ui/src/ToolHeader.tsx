@@ -89,11 +89,14 @@ const MoveOptions = (): React.ReactElement => {
         onChange={(showsTransformBox) => uiStore.setState({ showsTransformBox })}
       />
 
+      {/* Comme `TransformValueField` : chaque frappe qui forme un nombre
+          s'applique, le calque suit pendant qu'on tape. */}
       <div className="flex items-center gap-1_5">
         <NumberField
           label="X"
           value={layer?.transform.origin.x ?? 0}
           disabled={layer === undefined}
+          applyWhileTyping
           onChange={(x) =>
             edit((l) => ({ ...l, transform: { ...l.transform, origin: { ...l.transform.origin, x } } }))
           }
@@ -102,6 +105,7 @@ const MoveOptions = (): React.ReactElement => {
           label="Y"
           value={layer?.transform.origin.y ?? 0}
           disabled={layer === undefined}
+          applyWhileTyping
           onChange={(y) =>
             edit((l) => ({ ...l, transform: { ...l.transform, origin: { ...l.transform.origin, y } } }))
           }
@@ -110,6 +114,7 @@ const MoveOptions = (): React.ReactElement => {
           label="L"
           value={layer?.transform.size.width ?? 0}
           disabled={layer === undefined}
+          applyWhileTyping
           min={1}
           onChange={(width) =>
             edit((l) => {
@@ -124,6 +129,7 @@ const MoveOptions = (): React.ReactElement => {
           label="H"
           value={layer?.transform.size.height ?? 0}
           disabled={layer === undefined}
+          applyWhileTyping
           min={1}
           onChange={(height) =>
             edit((l) => {
