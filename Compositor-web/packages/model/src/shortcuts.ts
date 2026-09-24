@@ -38,7 +38,7 @@ export const opacityFromDigit = (
   return { percent: digit === 0 ? 100 : digit * 10, pending: { digit, time } };
 };
 
-/** Le mode suivant ou précédent, en boucle, dans l'ordre des quatorze. */
+/** Le mode suivant ou précédent, en boucle, dans l'ordre du menu. */
 export const cycleBlendMode = (mode: BlendMode, forward: boolean): BlendMode => {
   const index = BLEND_MODES.indexOf(mode);
   const from = index < 0 ? 0 : index;

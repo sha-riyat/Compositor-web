@@ -13,13 +13,19 @@
  */
 
 export type BlendMode =
-  | 'normal' | 'multiply' | 'screen' | 'overlay' | 'softLight'
-  | 'darken' | 'lighten' | 'difference' | 'colorDodge' | 'colorBurn'
+  | 'normal'
+  | 'darken' | 'multiply' | 'colorBurn' | 'linearBurn'
+  | 'lighten' | 'screen' | 'colorDodge' | 'linearDodge'
+  | 'overlay' | 'softLight' | 'hardLight' | 'vividLight' | 'linearLight' | 'pinLight' | 'hardMix'
+  | 'difference' | 'exclusion' | 'subtract' | 'divide'
   | 'hue' | 'saturation' | 'color' | 'luminosity';
 
 export const ALL_MODES: readonly BlendMode[] = [
-  'normal', 'multiply', 'screen', 'overlay', 'softLight',
-  'darken', 'lighten', 'difference', 'colorDodge', 'colorBurn',
+  'normal',
+  'darken', 'multiply', 'colorBurn', 'linearBurn',
+  'lighten', 'screen', 'colorDodge', 'linearDodge',
+  'overlay', 'softLight', 'hardLight', 'vividLight', 'linearLight', 'pinLight', 'hardMix',
+  'difference', 'exclusion', 'subtract', 'divide',
   'hue', 'saturation', 'color', 'luminosity',
 ];
 
@@ -42,17 +48,50 @@ const softLight = (b: number, s: number): number => {
   return b + (2 * s - 1) * (d - b);
 };
 
+const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
+
+/** Densité couleur + sous 50 %, Densité couleur − au-dessus. */
+const vividLight = (b: number, s: number): number =>
+  s <= 0.5 ? colorBurn(b, 2 * s) : colorDodge(b, 2 * s - 1);
+
+/**
+ * Tout ou rien : 1 quand fond et source additionnés atteignent 1. C'est
+ * l'équivalent exact de « Lumière vive ≥ 0,5 », sans ses divisions.
+ *
+ * Les octets tombent sur des multiples de 1/255 : `b + s ≥ 1` se décide sur un
+ * entier, et le demi-pas de marge garde la même décision au GPU malgré
+ * l'arrondi flottant.
+ */
+const hardMix = (b: number, s: number): number => (b + s > 1 - 0.5 / 255 ? 1 : 0);
+
+/**
+ * Le fond divisé par la source. Diviser par zéro donne du blanc, sauf sur un
+ * fond noir — 0/0 reste noir.
+ */
+const divide = (b: number, s: number): number => (s <= 0 ? (b <= 0 ? 0 : 1) : Math.min(1, b / s));
+
 const SEPARABLE: Record<string, (b: number, s: number) => number> = {
   normal: (_b, s) => s,
+  darken: (b, s) => Math.min(b, s),
   multiply,
+  colorBurn,
+  linearBurn: (b, s) => Math.max(0, b + s - 1),
+  lighten: (b, s) => Math.max(b, s),
   screen,
+  colorDodge,
+  linearDodge: (b, s) => Math.min(1, b + s),
   overlay: (b, s) => hardLight(s, b),
   softLight,
-  darken: (b, s) => Math.min(b, s),
-  lighten: (b, s) => Math.max(b, s),
+  hardLight,
+  vividLight,
+  linearLight: (b, s) => clamp01(b + 2 * s - 1),
+  pinLight: (b, s) => (s <= 0.5 ? Math.min(b, 2 * s) : Math.max(b, 2 * s - 1)),
+  hardMix,
   difference: (b, s) => Math.abs(b - s),
-  colorDodge,
-  colorBurn,
+  exclusion: (b, s) => b + s - 2 * b * s,
+  // Le fond moins la source, jamais l'inverse : l'amont s'y est déjà trompé.
+  subtract: (b, s) => Math.max(0, b - s),
+  divide,
 };
 
 /** Les coefficients de la spécification, non ceux de Rec. 709. */

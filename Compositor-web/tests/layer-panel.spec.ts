@@ -161,9 +161,11 @@ test.describe('opacité au clavier', () => {
 });
 
 test.describe('mode de fusion au clavier', () => {
+  // L'ordre est celui de Photoshop : après Normal vient Obscurcir
+  // (`BlendShortcutTests`, depuis l'amont 1.2.2).
   test('Maj + avance d’un mode', async () => {
     await press('+', 'Equal', true);
-    expect((await state()).blendMode).toBe('multiply');
+    expect((await state()).blendMode).toBe('darken');
   });
 
   test('Maj − recule, en boucle jusqu’au dernier mode', async () => {
@@ -173,7 +175,7 @@ test.describe('mode de fusion au clavier', () => {
 
   test('le pavé numérique avance et recule', async () => {
     await press('+', 'NumpadAdd');
-    expect((await state()).blendMode).toBe('multiply');
+    expect((await state()).blendMode).toBe('darken');
     await press('-', 'NumpadSubtract');
     expect((await state()).blendMode).toBe('normal');
   });
@@ -181,5 +183,31 @@ test.describe('mode de fusion au clavier', () => {
   test('un « + » sans Maj ne change rien', async () => {
     await press('=', 'Equal', false);
     expect((await state()).blendMode).toBe('normal');
+  });
+});
+
+test.describe('menu des modes de fusion', () => {
+  /**
+   * Les 24 modes de l'amont 1.2.2, dans l'ordre de Photoshop, avec une ligne
+   * entre chaque groupe (`LayerBlendMode.groups`).
+   */
+  test('24 modes en six groupes, séparés par cinq lignes', async () => {
+    await page.getByRole('button', { name: 'Normal' }).click();
+    // React Aria nomme le menu d'après le bouton qui l'ouvre, pas d'après son
+    // `aria-label` : il n'y en a qu'un d'ouvert, pas besoin de le nommer.
+    const menu = page.getByRole('menu');
+    await expect(menu).toBeVisible();
+
+    const labels = await menu.getByRole('menuitem').allTextContents();
+    expect(labels).toHaveLength(24);
+    expect(labels.slice(0, 5)).toEqual([
+      'Normal', 'Obscurcir', 'Produit', 'Densité couleur +', 'Densité linéaire +',
+    ]);
+    expect(labels.slice(-4)).toEqual(['Teinte', 'Saturation', 'Couleur', 'Luminosité']);
+    await expect(menu.getByRole('separator')).toHaveCount(5);
+
+    // Choisir un des nouveaux modes l'écrit bien dans le calque.
+    await menu.getByRole('menuitem', { name: 'Lumière ponctuelle' }).click();
+    expect((await state()).blendMode).toBe('pinLight');
   });
 });
