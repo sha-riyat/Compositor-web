@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import {
   documentStore,
+  setActiveLayer,
   topmostLayerAt,
   uiStore,
   type CompositorDocument,
@@ -100,7 +101,8 @@ export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.
         log.end(documentStore.getState().document);
       },
       selectLayer(id): void {
-        documentStore.setState({ activeLayerId: id });
+        // Même règle que partout : le calque désigné devient le seul sélectionné.
+        setActiveLayer(id);
       },
       requestRedraw,
       toDocument,
