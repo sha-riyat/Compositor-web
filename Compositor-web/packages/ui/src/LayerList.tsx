@@ -3,6 +3,7 @@ import { Copy, Plus, Trash } from '@phosphor-icons/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useStore } from 'zustand';
 import {
+  activeAfterRemoval,
   documentStore,
   duplicateLayers,
   insertBlankLayer,
@@ -11,6 +12,7 @@ import {
   removeLayers,
   renameLayer,
   selectLayers,
+  setActiveLayer,
   setLayersVisible,
   type CompositorDocument,
   type LayerId,
@@ -139,10 +141,16 @@ export const LayerList = (): React.ReactElement => {
   const addBlank = (): void =>
     mutate((doc) => insertBlankLayer(doc, crypto.randomUUID(), 'Calque', activeLayerId));
 
+  /**
+   * Le calque qui prend la place de l'actif devient actif, comme dans
+   * l'original — plutôt qu'une sélection vide, qui obligeait à recliquer.
+   */
   const removeSelected = (): void => {
-    const ids = documentStore.getState().selectedLayerIds;
-    mutate((doc) => removeLayers(doc, ids));
-    selectLayers([]);
+    const { document, selectedLayerIds, activeLayerId } = documentStore.getState();
+    if (document === null) return;
+    const next = activeAfterRemoval(document, selectedLayerIds, activeLayerId);
+    mutate((doc) => removeLayers(doc, selectedLayerIds));
+    setActiveLayer(next);
   };
 
   const duplicateSelected = (): void => {
