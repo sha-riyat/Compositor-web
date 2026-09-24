@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 /**
  * Les boutons du bas du panneau, et ce que l'original choisit à la place de
- * l'utilisateur : quel calque reste actif après une suppression.
+ * l'utilisateur : quel calque reste actif après une suppression, comment
+ * s'appelle un calque vide.
  */
 
 interface State {
@@ -62,4 +63,16 @@ test('supprimer le calque actif rend actif celui qui prend sa place', async ({ p
   expect(await state(page)).toEqual({ names: ['L1'], active: 'L1', selected: ['L1'] });
   await page.getByRole('button', { name: 'Supprimer' }).click();
   expect(await state(page)).toEqual({ names: [], active: null, selected: [] });
+});
+
+test('un calque vide est numéroté, posé au-dessus de l’actif, et devient actif', async ({ page }) => {
+  await setUp(page);
+  await page.getByRole('button', { name: 'Nouveau calque' }).click();
+  expect(await state(page)).toEqual({
+    names: ['L1', 'L2', 'Calque 1', 'L3'],
+    active: 'Calque 1',
+    selected: ['Calque 1'],
+  });
+  await page.getByRole('button', { name: 'Nouveau calque' }).click();
+  expect((await state(page)).active).toBe('Calque 2');
 });

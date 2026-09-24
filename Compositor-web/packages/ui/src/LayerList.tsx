@@ -9,6 +9,7 @@ import {
   insertBlankLayer,
   layerRange,
   moveLayer,
+  nextBlankLayerName,
   removeLayers,
   renameLayer,
   selectLayers,
@@ -138,8 +139,12 @@ export const LayerList = (): React.ReactElement => {
     if (name !== null) mutate((doc) => renameLayer(doc, id, name));
   };
 
-  const addBlank = (): void =>
-    mutate((doc) => insertBlankLayer(doc, crypto.randomUUID(), 'Calque', activeLayerId));
+  /** Numéroté comme dans l'original, et aussitôt actif — `addBlankLayer`. */
+  const addBlank = (): void => {
+    const id = crypto.randomUUID();
+    mutate((doc) => insertBlankLayer(doc, id, nextBlankLayerName(doc), activeLayerId));
+    if (documentStore.getState().document?.layers.some((l) => l.id === id) === true) setActiveLayer(id);
+  };
 
   /**
    * Le calque qui prend la place de l'actif devient actif, comme dans

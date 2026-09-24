@@ -192,3 +192,13 @@ export const activeAfterRemoval = (
   return current;
 };
 
+/**
+ * Le nom d'un nouveau calque vide : « Calque » suivi du plus petit numéro
+ * libre, comme les « Layer N » d'`addBlankLayer` dans l'original.
+ */
+export const nextBlankLayerName = (document: CompositorDocument): string => {
+  const names = new Set(document.layers.map((l) => l.name));
+  let number = 1;
+  while (names.has(`Calque ${number}`)) number++;
+  return `Calque ${number}`;
+};
