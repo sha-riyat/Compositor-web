@@ -76,3 +76,26 @@ export const renderThumbnail = (buffer: PixelBuffer, size: number): Thumbnail =>
 
   return { width: tw, height: th, data: out };
 };
+
+/**
+ * La forme du canevas, ajustée dans un carré de `box` points, en points
+ * entiers — `CanvasThumbnail.fittedSize`. Une miniature montre le **canevas
+ * entier**, comme Photoshop : un document en paysage donne une vignette en
+ * paysage.
+ *
+ * Un canevas sans taille donne le carré plein, plutôt qu'une division par zéro.
+ */
+export const fittedSize = (
+  canvasWidth: number,
+  canvasHeight: number,
+  box: number,
+): { readonly width: number; readonly height: number } => {
+  const valid =
+    canvasWidth > 0 && canvasHeight > 0 && Number.isFinite(canvasWidth) && Number.isFinite(canvasHeight);
+  if (!valid) return { width: box, height: box };
+  const scale = box / Math.max(canvasWidth, canvasHeight);
+  return {
+    width: Math.max(1, Math.round(canvasWidth * scale)),
+    height: Math.max(1, Math.round(canvasHeight * scale)),
+  };
+};

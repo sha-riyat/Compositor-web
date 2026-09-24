@@ -18,6 +18,8 @@ export interface LayerRowProps {
   readonly subtitle: string;
   readonly isSelected: boolean;
   readonly isActive: boolean;
+  /** Actif et seul sélectionné : sa miniature porte la bordure d'accent. */
+  readonly isSoleSelection: boolean;
   readonly isRenaming: boolean;
   readonly isDragging: boolean;
   onSelect(event: React.PointerEvent): void;
@@ -32,6 +34,7 @@ export const LayerRow = ({
   subtitle,
   isSelected,
   isActive,
+  isSoleSelection,
   isRenaming,
   isDragging,
   onSelect,
@@ -84,7 +87,7 @@ export const LayerRow = ({
         {layer.isVisible ? <Eye size={14} /> : <EyeSlash size={14} />}
       </button>
 
-      <LayerThumbnail layer={layer} />
+      <LayerThumbnail layer={layer} highlighted={isActive && isSoleSelection} />
 
       {isRenaming ? (
         <input

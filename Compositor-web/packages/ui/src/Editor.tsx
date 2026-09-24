@@ -8,6 +8,7 @@ import {
   documentStore,
   fitViewport,
   isDocumentOpaque,
+  setActiveLayer,
   identityTransform,
   uiStore,
   type CompositorDocument,
@@ -84,10 +85,11 @@ export const Editor = (): React.ReactElement => {
         assetId,
       );
 
-      documentStore.setState({
-        document: addLayer(current, layer),
-        activeLayerId: layer.id,
-      });
+      documentStore.setState({ document: addLayer(current, layer) });
+      // Actif et seul sélectionné, comme le setter d'`activeLayerID` de
+      // l'original : sans sélection, la ligne ne se surligne pas et les
+      // raccourcis d'opacité n'ont rien sur quoi agir.
+      setActiveLayer(layer.id);
 
       if (state.document === null) fitToView(current);
     } catch (error) {
