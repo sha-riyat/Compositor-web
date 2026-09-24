@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { ALL_MODES, composite, type BlendMode } from './reference/blend.js';
 
 /**
- * Les quatorze modes de fusion, comparés à une implémentation de référence
+ * Les vingt-quatre modes de fusion, comparés à une implémentation de référence
  * écrite en TypeScript — le GPU exécute du GLSL, la référence tourne sur le
  * processeur, et les deux doivent tomber sur les mêmes octets.
  *
@@ -30,6 +30,10 @@ const CASES: readonly Case[] = [
   { name: 'fond a 25 pourcent, source opaque', backdrop: [230, 40, 180, 64], source: [20, 220, 90, 255] },
   { name: 'noir sous blanc', backdrop: [0, 0, 0, 255], source: [255, 255, 255, 200] },
   { name: 'blanc sous noir', backdrop: [255, 255, 255, 255], source: [0, 0, 0, 200] },
+  // Soustraction et Division ne sont pas symétriques : un cas où le fond est
+  // plus clair que la source, un autre où c'est l'inverse.
+  { name: 'fond clair, source sombre', backdrop: [204, 180, 150, 255], source: [102, 60, 30, 255] },
+  { name: 'fond sombre, source claire', backdrop: [102, 60, 30, 255], source: [204, 180, 150, 255] },
 ];
 
 /**
@@ -185,3 +189,44 @@ for (const scenario of CASES) {
     }
   });
 }
+
+/**
+ * Les valeurs chiffrées par l'amont dans le commit qui ajoute ces modes
+ * (`09a65db`) : un gris à 80 % sur un gris à 40 %.
+ *
+ * Elles ne passent **pas** par la référence TypeScript. Si une formule de la
+ * référence était mal recopiée, le shader et la référence pourraient se
+ * tromper ensemble ; ces nombres-là viennent d'ailleurs — de Photoshop, selon
+ * l'amont.
+ */
+test.describe('valeurs chiffrées par l’amont', () => {
+  const grey = (value: number): [number, number, number, number] => [value, value, value, 255];
+  const GREY_40 = grey(102);
+  const GREY_80 = grey(204);
+
+  const EXPECTED: readonly (readonly [BlendMode, number])[] = [
+    ['linearBurn', 0.2],
+    ['pinLight', 0.6],
+    ['hardLight', 0.761],
+    ['exclusion', 0.561],
+    ['divide', 0.502],
+  ];
+
+  for (const [mode, value] of EXPECTED) {
+    test(`80 % sur 40 % en ${mode} donne ${value}`, async () => {
+      const got = await compositePixel(page, GREY_40, GREY_80, mode);
+      expect(Math.abs(got[0]! / 255 - value)).toBeLessThanOrEqual(0.002);
+    });
+  }
+
+  /** L'ordre des opérandes : c'est le fond moins la source, jamais l'inverse. */
+  test('Soustraction retire la source du fond, pas l’inverse', async () => {
+    expect((await compositePixel(page, GREY_80, GREY_40, 'subtract'))[0]).toBe(102);
+    expect((await compositePixel(page, GREY_40, GREY_80, 'subtract'))[0]).toBe(0);
+  });
+
+  test('Division divise le fond par la source, pas l’inverse', async () => {
+    expect((await compositePixel(page, GREY_40, GREY_80, 'divide'))[0]).toBe(128);
+    expect((await compositePixel(page, GREY_80, GREY_40, 'divide'))[0]).toBe(255);
+  });
+});

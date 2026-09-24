@@ -1,9 +1,11 @@
 import { BLEND_MODES, type BlendMode } from '@compositor/model';
 
 /**
- * Les quatorze modes de fusion, écrits d'après les formules de la spécification
- * PDF — celles que Core Graphics implémente, et donc celles que l'application
- * macOS produit.
+ * Les modes de fusion, écrits d'après les formules de la spécification PDF —
+ * celles que Core Graphics implémente, et donc celles que l'application macOS
+ * produit. Les dix que Core Graphics ne connaît pas (Densité linéaire, Lumière
+ * vive, Soustraction…) passent côté macOS par Core Image ; leurs formules sont
+ * celles de Photoshop, vérifiées par l'amont sur des valeurs chiffrées.
  *
  * ## Le terme que Core Graphics oublie
  *
@@ -33,11 +35,31 @@ import { BLEND_MODES, type BlendMode } from '@compositor/model';
 /** L'indice passé en uniforme, aligné sur `BLEND_MODES` du modèle. */
 export const blendModeIndex = (mode: BlendMode): number => BLEND_MODES.indexOf(mode);
 
+/**
+ * Les quatre modes non séparables, qui doivent fermer la liste : le shader les
+ * reconnaît à `u_mode >= MODE_HUE`.
+ */
+const NON_SEPARABLE: readonly BlendMode[] = ['hue', 'saturation', 'color', 'luminosity'];
+if (BLEND_MODES.slice(-NON_SEPARABLE.length).join() !== NON_SEPARABLE.join()) {
+  throw new Error('Les modes non séparables doivent fermer BLEND_MODES.');
+}
+
+/**
+ * Les indices des modes, **générés** depuis le modèle plutôt que recopiés :
+ * l'ordre suit le menu de Photoshop, et un numéro écrit à la main dans le
+ * GLSL divergerait en silence au prochain réordonnancement.
+ */
+const MODE_DEFINES = BLEND_MODES.map(
+  (mode, index) => `#define MODE_${mode.toUpperCase()} ${index}`,
+).join('\n');
+
 /** Les modes qui exigent de lire le fond, donc une passe de ping-pong. */
 export const needsBackdrop = (mode: BlendMode): boolean => mode !== 'normal';
 
 export const BLEND_FRAGMENT_SOURCE = `#version 300 es
 precision highp float;
+
+${MODE_DEFINES}
 
 /** UV de la cible : cette passe couvre tout le tampon, pas le quad du calque. */
 in vec2 v_uv;
@@ -86,17 +108,61 @@ float blendSoftLight(float b, float s) {
   return b + (2.0 * s - 1.0) * (d - b);
 }
 
+float blendLinearBurn(float b, float s)  { return max(0.0, b + s - 1.0); }
+float blendLinearDodge(float b, float s) { return min(1.0, b + s); }
+float blendLinearLight(float b, float s) { return clamp(b + 2.0 * s - 1.0, 0.0, 1.0); }
+float blendExclusion(float b, float s)   { return b + s - 2.0 * b * s; }
+
+/** Le fond moins la source, jamais l'inverse : l'amont s'y est déjà trompé. */
+float blendSubtract(float b, float s)    { return max(0.0, b - s); }
+
+/** Densité couleur + sous 50 %, Densité couleur − au-dessus. */
+float blendVividLight(float b, float s) {
+  return s <= 0.5 ? blendColorBurn(b, 2.0 * s) : blendColorDodge(b, 2.0 * s - 1.0);
+}
+
+float blendPinLight(float b, float s) {
+  return s <= 0.5 ? min(b, 2.0 * s) : max(b, 2.0 * s - 1.0);
+}
+
+/**
+ * Tout ou rien : 1 quand fond et source additionnés atteignent 1 — l'équivalent
+ * exact de « Lumière vive ≥ 0,5 », sans ses divisions. Le demi-pas d'octet de
+ * marge garde la décision stable malgré l'arrondi flottant.
+ */
+float blendHardMix(float b, float s) { return b + s > 1.0 - 0.5 / 255.0 ? 1.0 : 0.0; }
+
+/** Diviser par zéro donne du blanc, sauf sur un fond noir : 0/0 reste noir. */
+float blendDivide(float b, float s) {
+  if (s <= 0.0) return b <= 0.0 ? 0.0 : 1.0;
+  return min(1.0, b / s);
+}
+
+#define PER_CHANNEL(f) vec3(f(b.r, s.r), f(b.g, s.g), f(b.b, s.b))
+
 vec3 separable(int mode, vec3 b, vec3 s) {
-  if (mode == 1) return vec3(blendMultiply(b.r, s.r), blendMultiply(b.g, s.g), blendMultiply(b.b, s.b));
-  if (mode == 2) return vec3(blendScreen(b.r, s.r), blendScreen(b.g, s.g), blendScreen(b.b, s.b));
-  if (mode == 3) return vec3(blendOverlay(b.r, s.r), blendOverlay(b.g, s.g), blendOverlay(b.b, s.b));
-  if (mode == 4) return vec3(blendSoftLight(b.r, s.r), blendSoftLight(b.g, s.g), blendSoftLight(b.b, s.b));
-  if (mode == 5) return vec3(blendDarken(b.r, s.r), blendDarken(b.g, s.g), blendDarken(b.b, s.b));
-  if (mode == 6) return vec3(blendLighten(b.r, s.r), blendLighten(b.g, s.g), blendLighten(b.b, s.b));
-  if (mode == 7) return vec3(blendDifference(b.r, s.r), blendDifference(b.g, s.g), blendDifference(b.b, s.b));
-  if (mode == 8) return vec3(blendColorDodge(b.r, s.r), blendColorDodge(b.g, s.g), blendColorDodge(b.b, s.b));
-  if (mode == 9) return vec3(blendColorBurn(b.r, s.r), blendColorBurn(b.g, s.g), blendColorBurn(b.b, s.b));
-  return s; // Normal
+  switch (mode) {
+    case MODE_DARKEN:      return PER_CHANNEL(blendDarken);
+    case MODE_MULTIPLY:    return PER_CHANNEL(blendMultiply);
+    case MODE_COLORBURN:   return PER_CHANNEL(blendColorBurn);
+    case MODE_LINEARBURN:  return PER_CHANNEL(blendLinearBurn);
+    case MODE_LIGHTEN:     return PER_CHANNEL(blendLighten);
+    case MODE_SCREEN:      return PER_CHANNEL(blendScreen);
+    case MODE_COLORDODGE:  return PER_CHANNEL(blendColorDodge);
+    case MODE_LINEARDODGE: return PER_CHANNEL(blendLinearDodge);
+    case MODE_OVERLAY:     return PER_CHANNEL(blendOverlay);
+    case MODE_SOFTLIGHT:   return PER_CHANNEL(blendSoftLight);
+    case MODE_HARDLIGHT:   return PER_CHANNEL(blendHardLight);
+    case MODE_VIVIDLIGHT:  return PER_CHANNEL(blendVividLight);
+    case MODE_LINEARLIGHT: return PER_CHANNEL(blendLinearLight);
+    case MODE_PINLIGHT:    return PER_CHANNEL(blendPinLight);
+    case MODE_HARDMIX:     return PER_CHANNEL(blendHardMix);
+    case MODE_DIFFERENCE:  return PER_CHANNEL(blendDifference);
+    case MODE_EXCLUSION:   return PER_CHANNEL(blendExclusion);
+    case MODE_SUBTRACT:    return PER_CHANNEL(blendSubtract);
+    case MODE_DIVIDE:      return PER_CHANNEL(blendDivide);
+    default:               return s; // Normal
+  }
 }
 
 // ------------------------------------------------------------ non séparables
@@ -132,10 +198,10 @@ vec3 setSat(vec3 c, float s) {
 }
 
 vec3 nonSeparable(int mode, vec3 b, vec3 s) {
-  if (mode == 10) return setLum(setSat(s, sat(b)), lum(b)); // Teinte
-  if (mode == 11) return setLum(setSat(b, sat(s)), lum(b)); // Saturation
-  if (mode == 12) return setLum(s, lum(b));                 // Couleur
-  return setLum(b, lum(s));                                 // Luminosité
+  if (mode == MODE_HUE) return setLum(setSat(s, sat(b)), lum(b));
+  if (mode == MODE_SATURATION) return setLum(setSat(b, sat(s)), lum(b));
+  if (mode == MODE_COLOR) return setLum(s, lum(b));
+  return setLum(b, lum(s)); // Luminosité
 }
 
 // --------------------------------------------------------------- composition
@@ -159,7 +225,7 @@ void main() {
   vec3 cs = as > EPS ? src.rgb / as : vec3(0.0);
   vec3 cb = ab > EPS ? dst.rgb / ab : vec3(0.0);
 
-  vec3 blended = u_mode >= 10 ? nonSeparable(u_mode, cb, cs) : separable(u_mode, cb, cs);
+  vec3 blended = u_mode >= MODE_HUE ? nonSeparable(u_mode, cb, cs) : separable(u_mode, cb, cs);
 
   // Co est déjà prémultiplié : c'est une somme pondérée par les alphas.
   vec3 co = (1.0 - ab) * as * cs

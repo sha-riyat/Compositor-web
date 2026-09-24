@@ -6,39 +6,56 @@ export type LayerId = string;
 export type AssetId = string;
 
 /**
- * Les quatorze modes de `Compositor/Document/LayerAppearance.swift`.
- * Les quatre derniers ne sont pas séparables par canal.
+ * Les modes de fusion, groupés comme Photoshop les groupe — et comme
+ * `LayerBlendMode.groups` dans `Compositor/Document/LayerAppearance.swift` :
+ * obscurcissement, éclaircissement, contraste, comparaison, composantes.
+ *
+ * Le menu trace une ligne entre deux groupes, pour qu'une longue liste reste
+ * lisible.
+ *
+ * Dissolve, Couleur plus foncée et Couleur plus claire restent absents, comme
+ * dans l'original : le premier disperse des pixels au lieu de mélanger, les
+ * deux autres comparent la luminosité entière d'un pixel.
  */
-export const BLEND_MODES = [
-  'normal',
-  'multiply',
-  'screen',
-  'overlay',
-  'softLight',
-  'darken',
-  'lighten',
-  'difference',
-  'colorDodge',
-  'colorBurn',
-  'hue',
-  'saturation',
-  'color',
-  'luminosity',
+export const BLEND_MODE_GROUPS = [
+  ['normal'],
+  ['darken', 'multiply', 'colorBurn', 'linearBurn'],
+  ['lighten', 'screen', 'colorDodge', 'linearDodge'],
+  ['overlay', 'softLight', 'hardLight', 'vividLight', 'linearLight', 'pinLight', 'hardMix'],
+  ['difference', 'exclusion', 'subtract', 'divide'],
+  ['hue', 'saturation', 'color', 'luminosity'],
 ] as const;
 
-export type BlendMode = (typeof BLEND_MODES)[number];
+export type BlendMode = (typeof BLEND_MODE_GROUPS)[number][number];
 
+/**
+ * Les vingt-quatre modes, à plat, dans l'ordre du menu. C'est aussi l'ordre du
+ * cycle Maj + / Maj − : après Normal vient Obscurcir (`BlendShortcutTests`).
+ */
+export const BLEND_MODES: readonly BlendMode[] = BLEND_MODE_GROUPS.flat();
+
+/** Les noms de la version française de Photoshop. */
 export const BLEND_MODE_LABELS: Record<BlendMode, string> = {
   normal: 'Normal',
+  darken: 'Obscurcir',
   multiply: 'Produit',
+  colorBurn: 'Densité couleur +',
+  linearBurn: 'Densité linéaire +',
+  lighten: 'Éclaircir',
   screen: 'Superposition',
+  colorDodge: 'Densité couleur -',
+  linearDodge: 'Densité linéaire - (Ajout)',
   overlay: 'Incrustation',
   softLight: 'Lumière tamisée',
-  darken: 'Obscurcir',
-  lighten: 'Éclaircir',
+  hardLight: 'Lumière crue',
+  vividLight: 'Lumière vive',
+  linearLight: 'Lumière linéaire',
+  pinLight: 'Lumière ponctuelle',
+  hardMix: 'Mélange maximal',
   difference: 'Différence',
-  colorDodge: 'Densité couleur -',
-  colorBurn: 'Densité couleur +',
+  exclusion: 'Exclusion',
+  subtract: 'Soustraction',
+  divide: 'Division',
   hue: 'Teinte',
   saturation: 'Saturation',
   color: 'Couleur',

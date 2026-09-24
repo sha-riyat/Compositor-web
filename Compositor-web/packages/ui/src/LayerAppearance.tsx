@@ -1,8 +1,21 @@
+import { Fragment } from 'react';
 import { CaretDown } from '@phosphor-icons/react';
-import { Button, Label, Menu, MenuItem, MenuTrigger, Popover, Slider, SliderThumb, SliderTrack } from 'react-aria-components';
+import {
+  Button,
+  Label,
+  Menu,
+  MenuItem,
+  MenuSection,
+  MenuTrigger,
+  Popover,
+  Separator,
+  Slider,
+  SliderThumb,
+  SliderTrack,
+} from 'react-aria-components';
 import { useStore } from 'zustand';
 import {
-  BLEND_MODES,
+  BLEND_MODE_GROUPS,
   BLEND_MODE_LABELS,
   documentStore,
   replaceLayer,
@@ -57,9 +70,14 @@ export const LayerAppearance = (): React.ReactElement | null => {
             <CaretDown size={10} />
           </Button>
 
+          {/*
+            Pas de hauteur maximale fixe : React Aria borne le menu à la place
+            disponible. Les 24 modes tiennent sur un écran ordinaire, comme le
+            menu macOS qui les montre tous d'un coup.
+          */}
           <Popover
             placement="bottom start"
-            className="max-h-[320px] overflow-y-auto rounded-md border border-(--color-border) bg-(--color-panel-raised) p-0_5 shadow-lg"
+            className="overflow-y-auto rounded-md border border-(--color-border) bg-(--color-panel-raised) p-0_5 shadow-lg"
           >
             <Menu
               aria-label="Mode de fusion"
@@ -67,23 +85,31 @@ export const LayerAppearance = (): React.ReactElement | null => {
                 setBlendPreview(null);
                 commit((l) => ({ ...l, blendMode: key as BlendMode }));
               }}
-              className="flex w-[180px] flex-col outline-none"
+              className="flex w-[200px] flex-col outline-none"
             >
-              {BLEND_MODES.map((mode) => (
-                <MenuItem
-                  key={mode}
-                  id={mode}
-                  textValue={BLEND_MODE_LABELS[mode]}
-                  onHoverStart={() => setBlendPreview({ layerId: active.id, mode })}
-                  className={[
-                    'flex h-control cursor-default items-center rounded-sm px-1_5 text-ui outline-none',
-                    'data-hovered:bg-(--color-selection) data-hovered:text-(--color-accent-fg)',
-                    'data-focused:bg-(--color-selection) data-focused:text-(--color-accent-fg)',
-                    mode === active.blendMode ? 'font-medium' : '',
-                  ].join(' ')}
-                >
-                  {BLEND_MODE_LABELS[mode]}
-                </MenuItem>
+              {/* Groupés comme Photoshop, une ligne entre deux groupes. */}
+              {BLEND_MODE_GROUPS.map((group, index) => (
+                <Fragment key={group[0]}>
+                  {index > 0 && <Separator className="mx-1_5 my-0_5 h-px bg-(--color-border)" />}
+                  <MenuSection className="flex flex-col">
+                    {group.map((mode) => (
+                      <MenuItem
+                        key={mode}
+                        id={mode}
+                        textValue={BLEND_MODE_LABELS[mode]}
+                        onHoverStart={() => setBlendPreview({ layerId: active.id, mode })}
+                        className={[
+                          'flex h-control cursor-default items-center rounded-sm px-1_5 text-ui outline-none',
+                          'data-hovered:bg-(--color-selection) data-hovered:text-(--color-accent-fg)',
+                          'data-focused:bg-(--color-selection) data-focused:text-(--color-accent-fg)',
+                          mode === active.blendMode ? 'font-medium' : '',
+                        ].join(' ')}
+                      >
+                        {BLEND_MODE_LABELS[mode]}
+                      </MenuItem>
+                    ))}
+                  </MenuSection>
+                </Fragment>
               ))}
             </Menu>
           </Popover>
