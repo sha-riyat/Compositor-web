@@ -164,3 +164,41 @@ export const layerRange = (
   const [lo, hi] = a <= b ? [a, b] : [b, a];
   return document.layers.slice(lo, hi + 1).map((l) => l.id);
 };
+
+/**
+ * Le calque qui devient actif après une suppression — la règle de
+ * `finishDeletingLayer` (`Compositor/Document/LiveLayerMask.swift`).
+ *
+ * Les calques partent un à un, dans l'ordre de la pile. Quand le calque actif
+ * disparaît, celui qui prend sa place dans la pile devient actif — le suivant
+ * au-dessus, ou le nouveau sommet s'il était en haut. Une pile vidée n'a plus
+ * de calque actif.
+ */
+export const activeAfterRemoval = (
+  document: CompositorDocument,
+  ids: readonly LayerId[],
+  active: LayerId | null,
+): LayerId | null => {
+  const remaining = document.layers.map((l) => l.id);
+  const doomed = new Set(ids);
+  let current = active;
+  for (const id of document.layers.map((l) => l.id).filter((l) => doomed.has(l))) {
+    const index = remaining.indexOf(id);
+    remaining.splice(index, 1);
+    if (current === id) {
+      current = remaining.length === 0 ? null : remaining[Math.min(index, remaining.length - 1)]!;
+    }
+  }
+  return current;
+};
+
+/**
+ * Le nom d'un nouveau calque vide : « Calque » suivi du plus petit numéro
+ * libre, comme les « Layer N » d'`addBlankLayer` dans l'original.
+ */
+export const nextBlankLayerName = (document: CompositorDocument): string => {
+  const names = new Set(document.layers.map((l) => l.name));
+  let number = 1;
+  while (names.has(`Calque ${number}`)) number++;
+  return `Calque ${number}`;
+};
