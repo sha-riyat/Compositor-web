@@ -10,5 +10,6 @@ export * from './blendPreview.js';
 export * from './ToolRail.js';
 export * from './ToolHeader.js';
 export * from './NumberField.js';
-export * from './history.js';
+export * from './keyboard.js';
+export * from './useHistoryShortcuts.js';
 export * from './tools/moveTool.js';

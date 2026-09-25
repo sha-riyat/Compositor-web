@@ -31,15 +31,22 @@ export interface PixelBuffer {
 
 interface Entry {
   readonly buffer: PixelBuffer;
-  refCount: number;
   /** Incrémentée à chaque écriture : les caches s'en servent pour s'invalider. */
   revision: number;
 }
 
 /**
- * Magasin de pixels à comptage de références. Le modèle de document ne contient
- * que des `AssetId` ; plusieurs instantanés d'historique partagent donc les
- * mêmes pixels sans les copier — c'est ce que fait `DocumentHistory.swift`.
+ * Magasin de pixels. Le modèle de document ne contient que des `AssetId` ;
+ * plusieurs instantanés d'historique partagent donc les mêmes pixels sans les
+ * copier — c'est ce que fait `DocumentHistory.swift`.
+ *
+ * ## Durée de vie : par accessibilité
+ *
+ * Un actif vit tant que le document courant ou un instantané d'historique le
+ * référence ; `sweep` libère les autres. C'est l'équivalent de l'ARC sur les
+ * `CGImage` de l'original. Un comptage de références manuel existait, mais
+ * aucun appelant ne le tenait à jour : les pixels d'un calque supprimé n'étaient
+ * jamais libérés.
  */
 export class AssetStore {
   #entries = new Map<AssetId, Entry>();
@@ -47,7 +54,7 @@ export class AssetStore {
 
   add(buffer: PixelBuffer): AssetId {
     const id = `asset-${this.#nextId++}`;
-    this.#entries.set(id, { buffer, refCount: 1, revision: 1 });
+    this.#entries.set(id, { buffer, revision: 1 });
     return id;
   }
 
@@ -65,16 +72,20 @@ export class AssetStore {
     if (entry !== undefined) entry.revision++;
   }
 
-  retain(id: AssetId): void {
-    const entry = this.#entries.get(id);
-    if (entry !== undefined) entry.refCount++;
+  /** Libère tout actif absent de `reachable`. Rend le nombre d'actifs libérés. */
+  sweep(reachable: ReadonlySet<AssetId>): number {
+    let freed = 0;
+    for (const id of [...this.#entries.keys()]) {
+      if (reachable.has(id)) continue;
+      this.#entries.delete(id);
+      freed++;
+    }
+    return freed;
   }
 
-  release(id: AssetId): void {
-    const entry = this.#entries.get(id);
-    if (entry === undefined) return;
-    entry.refCount--;
-    if (entry.refCount <= 0) this.#entries.delete(id);
+  /** Taille en octets d'un actif, `0` s'il n'existe plus. */
+  bytesOf(id: AssetId): number {
+    return this.#entries.get(id)?.buffer.data.byteLength ?? 0;
   }
 
   get size(): number {

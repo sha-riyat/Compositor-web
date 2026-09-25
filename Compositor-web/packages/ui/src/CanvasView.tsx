@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react';
 import {
+  beginEdit,
   documentStore,
+  edit,
+  endEdit,
+  isEditing,
   setActiveLayer,
   topmostLayerAt,
   uiStore,
@@ -16,7 +20,6 @@ import {
   resizeToDisplay,
   watchDevicePixelRatio,
 } from '@compositor/renderer';
-import { TransactionLog } from './history.js';
 import { getBlendPreview, subscribeBlendPreview } from './blendPreview.js';
 
 /**
@@ -46,7 +49,6 @@ export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.
     const context = createRenderContext(canvas);
     const assets = documentStore.getState().assets;
     const compositor = new Compositor(context, assets);
-    const log = new TransactionLog();
     onCompositorReady?.(compositor);
 
     let frame = 0;
@@ -89,16 +91,22 @@ export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.
         return documentStore.getState().activeLayerId;
       },
       beginHistory(name: string): void {
-        log.begin(name, documentStore.getState().document);
+        beginEdit(name);
       },
       mutate(fn): void {
-        const current = documentStore.getState().document;
-        if (current === null) return;
-        const next = fn(current);
-        if (next !== current) documentStore.setState({ document: next });
+        const apply = (): void => {
+          const current = documentStore.getState().document;
+          if (current === null) return;
+          const next = fn(current);
+          if (next !== current) documentStore.setState({ document: next });
+        };
+        // Un outil qui modifie hors transaction passe quand même par
+        // l'historique : sinon une annulation effacerait sa modification.
+        if (isEditing()) apply();
+        else edit('Modifier le calque', apply);
       },
       endHistory(): void {
-        log.end(documentStore.getState().document);
+        endEdit();
       },
       selectLayer(id): void {
         // Même règle que partout : le calque désigné devient le seul sélectionné.

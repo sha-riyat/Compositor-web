@@ -18,6 +18,7 @@ import {
   BLEND_MODE_GROUPS,
   BLEND_MODE_LABELS,
   documentStore,
+  editDocument,
   replaceLayer,
   type BlendMode,
   type Layer,
@@ -49,11 +50,8 @@ export const LayerAppearance = (): React.ReactElement | null => {
   // `typeof layer` porterait le type déclaré, pas celui affiné par la garde.
   const active: Layer = layer;
 
-  const commit = (change: (l: Layer) => Layer): void => {
-    const current = documentStore.getState().document;
-    if (current === null) return;
-    documentStore.setState({ document: replaceLayer(current, active.id, change) });
-  };
+  const commit = (name: string, change: (l: Layer) => Layer): void =>
+    editDocument(name, (document) => replaceLayer(document, active.id, change));
 
   return (
     <div className="flex shrink-0 flex-col gap-1_5 border-b border-(--color-border) px-2 py-2">
@@ -84,7 +82,7 @@ export const LayerAppearance = (): React.ReactElement | null => {
               aria-label="Mode de fusion"
               onAction={(key) => {
                 setBlendPreview(null);
-                commit((l) => ({ ...l, blendMode: key as BlendMode }));
+                commit('Mode de fusion du calque', (l) => ({ ...l, blendMode: key as BlendMode }));
               }}
               className="flex w-[200px] flex-col outline-none"
             >
@@ -125,7 +123,7 @@ export const LayerAppearance = (): React.ReactElement | null => {
           maxValue={100}
           onChange={(value) => {
             const next = (Array.isArray(value) ? value[0]! : value) / 100;
-            commit((l) => ({ ...l, opacity: next }));
+            commit('Opacité du calque', (l) => ({ ...l, opacity: next }));
           }}
           className="flex flex-1 items-center gap-2"
         >
@@ -154,7 +152,7 @@ export const LayerAppearance = (): React.ReactElement | null => {
           max={100}
           unit="%"
           widthClass="w-[44px]"
-          onChange={(percent) => commit((l) => ({ ...l, opacity: percent / 100 }))}
+          onChange={(percent) => commit('Opacité du calque', (l) => ({ ...l, opacity: percent / 100 }))}
         />
       </div>
     </div>
