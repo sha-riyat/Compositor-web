@@ -23,8 +23,11 @@ import { ToolRail } from './ToolRail.js';
 import { ToolHeader } from './ToolHeader.js';
 import { useAppearanceShortcuts } from './useAppearanceShortcuts.js';
 import { useHistoryShortcuts } from './useHistoryShortcuts.js';
-import { saveProject, useSaveShortcut } from './saveProject.js';
+import { saveProject, useFileShortcuts } from './saveProject.js';
+import { filesFromBlob, openProject, projectFromDrop } from './openProject.js';
+import type { PackageFiles } from '@compositor/io';
 import { createMoveTool } from './tools/moveTool.js';
+import { fitToView } from './fitToView.js';
 
 /**
  * L'aide contextuelle de la barre d'état, reprise de l'application macOS : elle
@@ -112,7 +115,15 @@ export const Editor = (): React.ReactElement => {
       if (error !== null) setMessage(error);
     });
   }, []);
-  useSaveShortcut(save);
+  const picker = useRef<HTMLInputElement>(null);
+  const open = useCallback((files: () => Promise<PackageFiles>): void => {
+    setMessage(null);
+    void openProject(files, compositorRef.current?.maxSide ?? 4096).then((error) => {
+      if (error !== null) setMessage(error);
+    });
+  }, []);
+  const choose = useCallback((): void => picker.current?.click(), []);
+  useFileShortcuts(save, choose);
 
   const exportPNG = useCallback(async (): Promise<void> => {
     const current = documentStore.getState().document;
@@ -148,6 +159,12 @@ export const Editor = (): React.ReactElement => {
       onDrop={(event) => {
         event.preventDefault();
         setIsDropTarget(false);
+        // Un projet — zip ou dossier `.comp` — s'ouvre ; une image s'importe.
+        const project = projectFromDrop(event.dataTransfer);
+        if (project !== null) {
+          open(project);
+          return;
+        }
         const file = firstImageFile(event.dataTransfer);
         if (file !== null) void importFile(file);
       }}
@@ -156,6 +173,24 @@ export const Editor = (): React.ReactElement => {
         <span className="text-ui-lg font-semibold">Compositor</span>
         <span className="text-ui text-(--color-fg-faint)">T1 — squelette</span>
         <div className="flex-1" />
+        <input
+          ref={picker}
+          type="file"
+          accept=".comp,.zip"
+          hidden
+          aria-label="Choisir un projet à ouvrir"
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = '';
+            if (file !== undefined) open(filesFromBlob(file));
+          }}
+        />
+        <Button
+          onPress={choose}
+          className="h-control rounded-sm border border-(--color-border) bg-(--color-panel-raised) px-2 text-ui data-hovered:bg-(--color-border)"
+        >
+          Ouvrir…
+        </Button>
         <Button
           isDisabled={document === null}
           onPress={save}
@@ -195,7 +230,7 @@ export const Editor = (): React.ReactElement => {
           {document === null && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <p className="text-ui-lg text-(--color-fg-faint)">
-                Déposez une image PNG pour commencer.
+                Déposez une image PNG ou un projet .comp pour commencer.
               </p>
             </div>
           )}
@@ -208,18 +243,25 @@ export const Editor = (): React.ReactElement => {
         <LayerList />
       </div>
 
-      <footer className="flex h-control-lg shrink-0 items-center gap-3 border-t border-(--color-border) bg-(--color-panel) px-2 text-ui text-(--color-fg-muted)">
-        <span className="numeric">{formatZoom(viewport.scale)}</span>
+      {/* Une seule ligne, toujours : un message long se tronque — il reste
+          lisible en entier au survol — au lieu de faire passer le zoom sur
+          deux lignes. */}
+      <footer className="flex h-control-lg shrink-0 items-center gap-3 overflow-hidden whitespace-nowrap border-t border-(--color-border) bg-(--color-panel) px-2 text-ui text-(--color-fg-muted)">
+        <span className="numeric shrink-0">{formatZoom(viewport.scale)}</span>
         {document !== null && (
-          <span className="numeric">
+          <span className="numeric shrink-0">
             {formatPixels(document.width)} × {formatPixels(document.height)} px ·{' '}
             {document.resolution} ppp
           </span>
         )}
-        <span>{colourSpaceLabel}</span>
-        {message !== null && <span className="text-(--color-fg)">{message}</span>}
+        <span className="shrink-0">{colourSpaceLabel}</span>
+        {message !== null && (
+          <span role="status" title={message} className="min-w-0 truncate text-(--color-fg)">
+            {message}
+          </span>
+        )}
         <div className="flex-1" />
-        <span className="truncate text-(--color-fg-faint)">{TOOL_HINTS[tool] ?? ''}</span>
+        <span className="min-w-0 truncate text-(--color-fg-faint)">{TOOL_HINTS[tool] ?? ''}</span>
       </footer>
     </div>
   );
@@ -234,35 +276,3 @@ const formatZoom = (scale: number): string => {
 
 /** Séparateur de milliers, comme dans la barre d'état de l'original. */
 const formatPixels = (value: number): string => value.toLocaleString('fr-FR');
-
-/**
- * Cadre le document dans la vue à l'ouverture, comme le fait le Swift.
- *
- * Vise le canevas du document **par son rôle** plutôt que « le premier
- * `canvas` de la page » : cette désignation cesse d'être sûre dès qu'un autre
- * canevas apparaît dans l'interface.
- *
- * Si la vue n'a pas encore de taille — import avant la mise en page, fenêtre
- * réduite —, le cadrage attend la première taille réelle au lieu de calculer
- * une échelle nulle.
- */
-const fitToView = (document: CompositorDocument): void => {
-  const canvas = window.document.querySelector<HTMLCanvasElement>('canvas[data-role="document"]');
-  if (canvas === null) return;
-
-  const apply = (width: number, height: number): boolean => {
-    const viewport = fitViewport(document.width, document.height, width, height);
-    if (viewport === null) return false;
-    uiStore.setState({ viewport });
-    return true;
-  };
-
-  const rect = canvas.getBoundingClientRect();
-  if (apply(rect.width, rect.height)) return;
-
-  const observer = new ResizeObserver((entries) => {
-    const box = entries[0]?.contentRect;
-    if (box !== undefined && apply(box.width, box.height)) observer.disconnect();
-  });
-  observer.observe(canvas);
-};
