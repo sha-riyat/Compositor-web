@@ -37,14 +37,41 @@ export interface Transform {
   readonly sampling: Sampling;
 }
 
+/**
+ * Le placement d'un calque neuf. L'échantillonnage vaut « High quality »,
+ * la valeur par défaut de `LayerTransform` dans l'original : un calque importé
+ * ou vide doit s'enregistrer comme le Mac l'enregistrerait.
+ */
 export const identityTransform = (size: Size, origin: Point = { x: 0, y: 0 }): Transform => ({
   origin,
   size,
   radians: 0,
   flipX: false,
   flipY: false,
-  sampling: 'linear',
+  sampling: 'high',
 });
+
+/**
+ * Pixels entiers et degrés entiers — ce que laissent un glissement, une mise
+ * à l'échelle ou une rotation dans l'original (`LayerTransform.rounded`,
+ * appliqué à chaque mise à jour du glissement dans `EditorCanvas.swift`).
+ * Les valeurs **tapées**, elles, restent exactes.
+ */
+export const roundTransform = (t: Transform): Transform => ({
+  ...t,
+  origin: { x: rounded(t.origin.x), y: rounded(t.origin.y) },
+  size: { width: Math.max(1, rounded(t.size.width)), height: Math.max(1, rounded(t.size.height)) },
+  radians: (rounded((t.radians * 180) / Math.PI) * Math.PI) / 180,
+});
+
+/**
+ * Le `.rounded()` de Swift : les demis s'éloignent de zéro (-0,5 → -1), là où
+ * `Math.round` les pousse vers +∞ (-0,5 → -0). Jamais de zéro négatif.
+ */
+export const rounded = (value: number): number => {
+  const result = Math.sign(value) * Math.round(Math.abs(value));
+  return result === 0 ? 0 : result;
+};
 
 export const transformCenter = (t: Transform): Point => ({
   x: t.origin.x + t.size.width / 2,

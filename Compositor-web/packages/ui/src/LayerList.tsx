@@ -16,6 +16,7 @@ import {
   nextBlankLayerName,
   removeLayers,
   renameLayer,
+  rounded,
   selectLayers,
   setActiveLayer,
   setLayersVisible,
@@ -195,18 +196,13 @@ export const LayerList = (): React.ReactElement => {
    * les dimensions pour un calque de pixels, la nature pour le reste.
    */
   const subtitle = (layerId: LayerId): string => {
-    const state = documentStore.getState();
-    const layer = state.document?.layers.find((l) => l.id === layerId);
+    const layer = documentStore.getState().document?.layers.find((l) => l.id === layerId);
     if (layer === undefined) return '';
     if (layer.isGroup) return 'Dossier';
-    if (layer.asset === null) {
-      const { width, height } = layer.transform.size;
-      return `${Math.round(width)} × ${Math.round(height)} px · vide`;
-    }
-    const buffer = state.assets.get(layer.asset);
-    return buffer === undefined
-      ? ''
-      : `${buffer.width} × ${buffer.height} px`;
+    // Comme l'original : la taille du **placement**, arrondie — un calque
+    // redimensionné affiche sa nouvelle taille —, sans distinguer un calque vide.
+    const { width, height } = layer.transform.size;
+    return `${rounded(width)} × ${rounded(height)} px`;
   };
 
   return (

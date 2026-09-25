@@ -76,3 +76,40 @@ test('un calque vide est numéroté, posé au-dessus de l’actif, et devient ac
   await page.getByRole('button', { name: 'Nouveau calque' }).click();
   expect((await state(page)).active).toBe('Calque 2');
 });
+
+/**
+ * `NativeLayerList` : la seconde ligne montre la taille du **placement**,
+ * arrondie comme en Swift, et rien de plus pour un calque vide.
+ */
+test('la ligne d’un calque montre la taille de son placement, pas celle de l’image', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(
+    () => (window as never as { __compositor?: { compositor?: unknown } }).__compositor?.compositor !== undefined,
+  );
+  await page.evaluate(() => {
+    const { documentStore } = (window as never as {
+      __compositor: { documentStore: { getState(): { assets: { add(b: unknown): string } }; setState(s: unknown): void } };
+    }).__compositor;
+    const asset = documentStore.getState().assets.add({
+      width: 789, height: 709, data: new Uint8ClampedArray(789 * 709 * 4), isOpaque: false,
+    });
+    const t = (width: number, height: number) => ({
+      origin: { x: 0, y: 0 }, size: { width, height }, radians: 0, flipX: false, flipY: false, sampling: 'high',
+    });
+    const base = { isVisible: true, parentId: null, isGroup: false, opacity: 1, blendMode: 'normal' };
+    documentStore.setState({
+      document: {
+        id: 's', width: 800, height: 600, resolution: 72,
+        layers: [
+          { ...base, id: 'vide', name: 'Vide', asset: null, transform: t(800, 600) },
+          { ...base, id: 'image', name: 'Image', asset, transform: t(760.4, 683.5) },
+        ],
+      },
+      activeLayerId: null,
+      selectedLayerIds: [],
+    });
+  });
+  await expect(page.getByRole('option', { name: /Image/ })).toContainText('760 × 684 px');
+  await expect(page.getByRole('option', { name: /Vide/ })).toContainText('800 × 600 px');
+  await expect(page.getByRole('option', { name: /Vide/ })).not.toContainText('vide');
+});
