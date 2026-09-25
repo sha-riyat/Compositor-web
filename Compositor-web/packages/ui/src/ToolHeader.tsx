@@ -2,6 +2,7 @@ import { LinkSimple } from '@phosphor-icons/react';
 import { useStore } from 'zustand';
 import {
   documentStore,
+  editDocument,
   replaceLayer,
   uiStore,
   type Layer,
@@ -70,10 +71,8 @@ const MoveOptions = (): React.ReactElement => {
       : document.layers.find((l) => l.id === activeLayerId);
 
   const edit = (change: (l: Layer) => Layer): void => {
-    const current = documentStore.getState().document;
-    if (current === null || activeLayerId === null) return;
-    const next = replaceLayer(current, activeLayerId, change);
-    if (next !== current) documentStore.setState({ document: next });
+    if (activeLayerId === null) return;
+    editDocument('Transformer le calque', (document) => replaceLayer(document, activeLayerId, change));
   };
 
   return (

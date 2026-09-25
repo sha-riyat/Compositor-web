@@ -193,7 +193,7 @@ export const createMoveTool = (options: MoveToolOptions): Tool => {
             startPoint: event.point,
             handle,
           };
-          api.beginHistory('Redimensionner le calque');
+          api.beginHistory('Transformer le calque');
           return;
         }
       }

@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
+import { isTextEntry } from './keyboard.js';
 import {
   cycleBlendMode,
   documentStore,
+  editDocument,
   opacityFromDigit,
   replaceLayer,
   setLayersOpacity,
@@ -61,18 +63,6 @@ export const useAppearanceShortcuts = (): void => {
   }, []);
 };
 
-const isTextEntry = (target: EventTarget | null): boolean => {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (target instanceof HTMLTextAreaElement) return true;
-  if (target instanceof HTMLInputElement) {
-    // Une case à cocher n'est pas un champ de texte : le raccourci doit
-    // continuer de marcher quand elle a le focus.
-    return !['checkbox', 'radio', 'button', 'range'].includes(target.type);
-  }
-  return false;
-};
-
 /** Le chiffre d'une touche, par la touche physique ou le pavé numérique. */
 const digitOf = (event: KeyboardEvent): number | null => {
   const physical = /^(?:Digit|Numpad)(\d)$/.exec(event.code);
@@ -94,16 +84,16 @@ const blendDirectionOf = (event: KeyboardEvent): boolean | null => {
 const applyOpacity = (opacity: number): void => {
   const { document, selectedLayerIds } = documentStore.getState();
   if (document === null || selectedLayerIds.length === 0) return;
-  const next = setLayersOpacity(document, selectedLayerIds, opacity);
-  if (next !== document) documentStore.setState({ document: next });
+  editDocument('Opacité du calque', (doc) => setLayersOpacity(doc, selectedLayerIds, opacity));
 };
 
 const cycleActiveLayer = (forward: boolean): void => {
   const { document, activeLayerId } = documentStore.getState();
   if (document === null || activeLayerId === null) return;
-  const next = replaceLayer(document, activeLayerId, (layer) => ({
-    ...layer,
-    blendMode: cycleBlendMode(layer.blendMode, forward),
-  }));
-  if (next !== document) documentStore.setState({ document: next });
+  editDocument('Mode de fusion du calque', (doc) =>
+    replaceLayer(doc, activeLayerId, (layer) => ({
+      ...layer,
+      blendMode: cycleBlendMode(layer.blendMode, forward),
+    })),
+  );
 };

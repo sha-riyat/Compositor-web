@@ -5,6 +5,8 @@ import { useStore } from 'zustand';
 import {
   activeAfterRemoval,
   documentStore,
+  edit,
+  editDocument,
   duplicateLayers,
   insertBlankLayer,
   layerRange,
@@ -60,13 +62,10 @@ export const LayerList = (): React.ReactElement => {
     overscan: 6,
   });
 
+  /** Chaque modification est une entrée d'annulation nommée. */
   const mutate = useCallback(
-    (change: (doc: CompositorDocument) => CompositorDocument): void => {
-      const current = documentStore.getState().document;
-      if (current === null) return;
-      const next = change(current);
-      if (next !== current) documentStore.setState({ document: next });
-    },
+    (name: string, change: (doc: CompositorDocument) => CompositorDocument): void =>
+      editDocument(name, change),
     [],
   );
 
@@ -121,7 +120,7 @@ export const LayerList = (): React.ReactElement => {
       const offset = move.clientY - box.top + element.scrollTop;
       const displayed = Math.max(0, Math.min(rows.length - 1, Math.floor(offset / (ROW_HEIGHT + ROW_GAP))));
       // Retour de l'indice affiché vers l'indice du modèle.
-      mutate((doc) => moveLayer(doc, id, doc.layers.length - 1 - displayed));
+      mutate('Réordonner les calques', (doc) => moveLayer(doc, id, doc.layers.length - 1 - displayed));
     };
 
     const onUp = (): void => {
@@ -136,14 +135,22 @@ export const LayerList = (): React.ReactElement => {
 
   const commitRename = (id: LayerId, name: string | null): void => {
     setRenamingId(null);
-    if (name !== null) mutate((doc) => renameLayer(doc, id, name));
+    if (name !== null) mutate('Renommer le calque', (doc) => renameLayer(doc, id, name));
   };
 
   /** Numéroté comme dans l'original, et aussitôt actif — `addBlankLayer`. */
   const addBlank = (): void => {
     const id = crypto.randomUUID();
-    mutate((doc) => insertBlankLayer(doc, id, nextBlankLayerName(doc), activeLayerId));
-    if (documentStore.getState().document?.layers.some((l) => l.id === id) === true) setActiveLayer(id);
+    // Le calque et sa sélection dans la même entrée : annuler rend aussi la
+    // sélection d'avant.
+    edit('Nouveau calque vide', () => {
+      const current = documentStore.getState().document;
+      if (current === null) return;
+      const next = insertBlankLayer(current, id, nextBlankLayerName(current), activeLayerId);
+      if (next === current) return;
+      documentStore.setState({ document: next });
+      setActiveLayer(id);
+    });
   };
 
   /**
@@ -154,8 +161,10 @@ export const LayerList = (): React.ReactElement => {
     const { document, selectedLayerIds, activeLayerId } = documentStore.getState();
     if (document === null) return;
     const next = activeAfterRemoval(document, selectedLayerIds, activeLayerId);
-    mutate((doc) => removeLayers(doc, selectedLayerIds));
-    setActiveLayer(next);
+    edit(selectedLayerIds.length > 1 ? 'Supprimer les calques' : 'Supprimer le calque', () => {
+      documentStore.setState({ document: removeLayers(document, selectedLayerIds) });
+      setActiveLayer(next);
+    });
   };
 
   const duplicateSelected = (): void => {
@@ -167,8 +176,10 @@ export const LayerList = (): React.ReactElement => {
       () => crypto.randomUUID(),
     );
     if (created.length === 0) return;
-    documentStore.setState({ document: next });
-    selectLayers(created);
+    edit('Dupliquer le calque', () => {
+      documentStore.setState({ document: next });
+      selectLayers(created);
+    });
   };
 
   const hasSelection = selectedLayerIds.length > 0;
@@ -236,7 +247,9 @@ export const LayerList = (): React.ReactElement => {
                     onStartRename={() => setRenamingId(layer.id)}
                     onCommitRename={(name) => commitRename(layer.id, name)}
                     onToggleVisible={() =>
-                      mutate((doc) => setLayersVisible(doc, [layer.id], !layer.isVisible))
+                      mutate(layer.isVisible ? 'Masquer le calque' : 'Afficher le calque', (doc) =>
+                        setLayersVisible(doc, [layer.id], !layer.isVisible),
+                      )
                     }
                   />
                 </div>

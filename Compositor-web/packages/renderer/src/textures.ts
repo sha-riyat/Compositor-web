@@ -93,6 +93,15 @@ export class TextureCache {
     gl.bindTexture(gl.TEXTURE_2D, null);
   }
 
+  /**
+   * Libère toute texture dont l'actif n'est pas dans `ids`. Le GPU ne garde
+   * que ce que le document affiché utilise : un actif retenu par l'historique
+   * sera retéléversé si une annulation le ramène.
+   */
+  retainOnly(ids: ReadonlySet<AssetId>): void {
+    for (const id of [...this.#entries.keys()]) if (!ids.has(id)) this.release(id);
+  }
+
   release(id: AssetId): void {
     const entry = this.#entries.get(id);
     if (entry === undefined) return;

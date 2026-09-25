@@ -6,6 +6,7 @@ import {
   createDocument,
   createLayer,
   documentStore,
+  edit,
   fitViewport,
   isDocumentOpaque,
   setActiveLayer,
@@ -21,6 +22,7 @@ import { LayerList } from './LayerList.js';
 import { ToolRail } from './ToolRail.js';
 import { ToolHeader } from './ToolHeader.js';
 import { useAppearanceShortcuts } from './useAppearanceShortcuts.js';
+import { useHistoryShortcuts } from './useHistoryShortcuts.js';
 import { createMoveTool } from './tools/moveTool.js';
 
 /**
@@ -44,6 +46,7 @@ export const Editor = (): React.ReactElement => {
   const document = useStore(documentStore, (s) => s.document);
   const compositorRef = useRef<Compositor | null>(null);
   useAppearanceShortcuts();
+  useHistoryShortcuts();
   const [message, setMessage] = useState<string | null>(null);
   const [isDropTarget, setIsDropTarget] = useState(false);
 
@@ -85,11 +88,15 @@ export const Editor = (): React.ReactElement => {
         assetId,
       );
 
-      documentStore.setState({ document: addLayer(current, layer) });
-      // Actif et seul sélectionné, comme le setter d'`activeLayerID` de
-      // l'original : sans sélection, la ligne ne se surligne pas et les
-      // raccourcis d'opacité n'ont rien sur quoi agir.
-      setActiveLayer(layer.id);
+      // Une entrée d'annulation ; sur une page vide, elle crée aussi le
+      // document, et l'annuler le retire, comme dans l'original.
+      edit('Importer une image', () => {
+        documentStore.setState({ document: addLayer(current, layer) });
+        // Actif et seul sélectionné, comme le setter d'`activeLayerID` de
+        // l'original : sans sélection, la ligne ne se surligne pas et les
+        // raccourcis d'opacité n'ont rien sur quoi agir.
+        setActiveLayer(layer.id);
+      });
 
       if (state.document === null) fitToView(current);
     } catch (error) {

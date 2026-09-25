@@ -7,3 +7,5 @@ export * from './store.js';
 export * from './tool.js';
 export * from './shortcuts.js';
 export * from './viewport.js';
+export * from './history.js';
+export * from './session.js';

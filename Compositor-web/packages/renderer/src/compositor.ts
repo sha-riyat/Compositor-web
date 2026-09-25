@@ -179,6 +179,11 @@ export class Compositor {
     gl.clearColor(0.102, 0.102, 0.102, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
+    // Seules les textures du document affiché restent sur le GPU.
+    this.#textures.retainOnly(
+      new Set((document?.layers ?? []).flatMap((layer) => (layer.asset === null ? [] : [layer.asset]))),
+    );
+
     if (document === null) return;
 
     const view = mat3Multiply(
