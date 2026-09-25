@@ -4,9 +4,11 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useStore } from 'zustand';
 import {
   activeAfterRemoval,
+  beginEdit,
   documentStore,
   edit,
   editDocument,
+  endEdit,
   duplicateLayers,
   insertBlankLayer,
   layerRange,
@@ -115,6 +117,9 @@ export const LayerList = (): React.ReactElement => {
       if (!moved) {
         moved = true;
         setDraggingId(id);
+        // Tout le glissement ne fait qu'une entrée, comme le dépôt unique de
+        // `reorderLayers` dans l'original.
+        beginEdit('Réordonner les calques');
       }
       const box = element.getBoundingClientRect();
       const offset = move.clientY - box.top + element.scrollTop;
@@ -127,6 +132,7 @@ export const LayerList = (): React.ReactElement => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       setDraggingId(null);
+      if (moved) endEdit();
     };
 
     window.addEventListener('pointermove', onMove);

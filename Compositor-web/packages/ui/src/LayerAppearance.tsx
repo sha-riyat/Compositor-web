@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import { CaretDown } from '@phosphor-icons/react';
 import {
   Button,
@@ -17,8 +17,10 @@ import { useStore } from 'zustand';
 import {
   BLEND_MODE_GROUPS,
   BLEND_MODE_LABELS,
+  beginEdit,
   documentStore,
   editDocument,
+  endEdit,
   replaceLayer,
   type BlendMode,
   type Layer,
@@ -36,6 +38,21 @@ import { NumberField } from './NumberField.js';
 export const LayerAppearance = (): React.ReactElement | null => {
   const document = useStore(documentStore, (s) => s.document);
   const activeLayerId = useStore(documentStore, (s) => s.activeLayerId);
+
+  // Un glissement du curseur d'opacité est **une** entrée d'annulation,
+  // ouverte au premier mouvement et fermée au relâchement — `beginOpacityEdit`
+  // et `finishOpacityEdit` dans l'original. Si le bloc disparaît en plein
+  // glissement, l'entrée se ferme quand même.
+  const sliding = useRef(false);
+  useEffect(
+    () => () => {
+      if (sliding.current) {
+        sliding.current = false;
+        endEdit();
+      }
+    },
+    [],
+  );
 
   const layer =
     document === null || activeLayerId === null
@@ -123,7 +140,16 @@ export const LayerAppearance = (): React.ReactElement | null => {
           maxValue={100}
           onChange={(value) => {
             const next = (Array.isArray(value) ? value[0]! : value) / 100;
+            if (!sliding.current) {
+              sliding.current = true;
+              beginEdit('Opacité du calque');
+            }
             commit('Opacité du calque', (l) => ({ ...l, opacity: next }));
+          }}
+          onChangeEnd={() => {
+            if (!sliding.current) return;
+            sliding.current = false;
+            endEdit();
           }}
           className="flex flex-1 items-center gap-2"
         >

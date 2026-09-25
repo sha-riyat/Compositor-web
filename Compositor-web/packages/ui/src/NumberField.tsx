@@ -36,6 +36,12 @@ export interface NumberFieldProps {
   readonly hideLabel?: boolean;
   /** Une classe de largeur Tailwind écrite en toutes lettres, `w-[44px]`. */
   readonly widthClass?: string;
+  /**
+   * Le séjour dans le champ, du focus à la sortie : ce que la frappe y change
+   * ne fait alors qu'**une** entrée d'annulation.
+   */
+  onEditStart?(): void;
+  onEditEnd?(): void;
 }
 
 export const NumberField = ({
@@ -50,10 +56,24 @@ export const NumberField = ({
   applyWhileTyping = false,
   hideLabel = false,
   widthClass = 'w-[54px]',
+  onEditStart,
+  onEditEnd,
 }: NumberFieldProps): React.ReactElement => {
   const [draft, setDraft] = useState(formatNumber(value));
   const [focused, setFocused] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  // Une référence plutôt qu'un état : la fin d'édition doit partir une seule
+  // fois, même si le champ disparaît pendant qu'il a le focus.
+  const editing = useRef(false);
+  const endEditing = useRef(onEditEnd);
+  endEditing.current = onEditEnd;
+
+  useEffect(
+    () => () => {
+      if (editing.current) endEditing.current?.();
+    },
+    [],
+  );
 
   // Hors édition, le champ suit la valeur réelle — qui bouge aussi quand on
   // fait glisser le calque sur le canevas.
@@ -71,6 +91,10 @@ export const NumberField = ({
     const parsed = parseNumber(draft);
     if (parsed !== null) apply(parsed);
     setFocused(false);
+    if (editing.current) {
+      editing.current = false;
+      onEditEnd?.();
+    }
   };
 
   return (
@@ -81,7 +105,13 @@ export const NumberField = ({
         value={draft}
         disabled={disabled}
         inputMode="decimal"
-        onFocus={() => setFocused(true)}
+        onFocus={() => {
+          setFocused(true);
+          if (!editing.current) {
+            editing.current = true;
+            onEditStart?.();
+          }
+        }}
         onChange={(event) => {
           setDraft(event.target.value);
           if (applyWhileTyping) {

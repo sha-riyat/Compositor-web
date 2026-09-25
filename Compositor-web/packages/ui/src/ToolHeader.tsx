@@ -1,8 +1,10 @@
 import { LinkSimple } from '@phosphor-icons/react';
 import { useStore } from 'zustand';
 import {
+  beginEdit,
   documentStore,
   editDocument,
+  endEdit,
   replaceLayer,
   uiStore,
   type Layer,
@@ -70,6 +72,11 @@ const MoveOptions = (): React.ReactElement => {
       ? undefined
       : document.layers.find((l) => l.id === activeLayerId);
 
+  // L'original tape dans un brouillon de transformation, validé en une fois
+  // (`transformEdit.draft`). Sans ce mode — prévu en T8 —, l'équivalent fidèle
+  // est une entrée par séjour dans le champ : taper `150` n'en coûte qu'une.
+  const startTyping = (): void => beginEdit('Transformer le calque');
+
   const edit = (change: (l: Layer) => Layer): void => {
     if (activeLayerId === null) return;
     editDocument('Transformer le calque', (document) => replaceLayer(document, activeLayerId, change));
@@ -96,6 +103,8 @@ const MoveOptions = (): React.ReactElement => {
           value={layer?.transform.origin.x ?? 0}
           disabled={layer === undefined}
           applyWhileTyping
+          onEditStart={startTyping}
+          onEditEnd={endEdit}
           onChange={(x) =>
             edit((l) => ({ ...l, transform: { ...l.transform, origin: { ...l.transform.origin, x } } }))
           }
@@ -105,6 +114,8 @@ const MoveOptions = (): React.ReactElement => {
           value={layer?.transform.origin.y ?? 0}
           disabled={layer === undefined}
           applyWhileTyping
+          onEditStart={startTyping}
+          onEditEnd={endEdit}
           onChange={(y) =>
             edit((l) => ({ ...l, transform: { ...l.transform, origin: { ...l.transform.origin, y } } }))
           }
@@ -114,6 +125,8 @@ const MoveOptions = (): React.ReactElement => {
           value={layer?.transform.size.width ?? 0}
           disabled={layer === undefined}
           applyWhileTyping
+          onEditStart={startTyping}
+          onEditEnd={endEdit}
           min={1}
           onChange={(width) =>
             edit((l) => {
@@ -129,6 +142,8 @@ const MoveOptions = (): React.ReactElement => {
           value={layer?.transform.size.height ?? 0}
           disabled={layer === undefined}
           applyWhileTyping
+          onEditStart={startTyping}
+          onEditEnd={endEdit}
           min={1}
           onChange={(height) =>
             edit((l) => {
