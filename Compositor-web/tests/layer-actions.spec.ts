@@ -42,7 +42,7 @@ const setUp = async (page: Page): Promise<void> => {
   await page.evaluate(() => {
     const layer = (id: string) => ({
       id, name: id, asset: null, isVisible: true, parentId: null, isGroup: false, opacity: 1, blendMode: 'normal',
-      transform: { origin: { x: 0, y: 0 }, size: { width: 800, height: 600 }, radians: 0, flipX: false, flipY: false, sampling: 'linear' },
+      transform: { origin: { x: 0, y: 0 }, size: { width: 800, height: 600 }, rotation: 0, flipX: false, flipY: false, sampling: 'linear' },
     });
     (window as never as { __compositor: { documentStore: { setState(s: unknown): void } } }).__compositor.documentStore.setState({
       document: { id: 'a', width: 800, height: 600, resolution: 72, layers: [layer('L1'), layer('L2'), layer('L3')] },
@@ -94,7 +94,7 @@ test('la ligne dâ€™un calque montre la taille de son placement, pas celle de lâ€
       width: 789, height: 709, data: new Uint8ClampedArray(789 * 709 * 4), isOpaque: false,
     });
     const t = (width: number, height: number) => ({
-      origin: { x: 0, y: 0 }, size: { width, height }, radians: 0, flipX: false, flipY: false, sampling: 'high',
+      origin: { x: 0, y: 0 }, size: { width, height }, rotation: 0, flipX: false, flipY: false, sampling: 'high',
     });
     const base = { isVisible: true, parentId: null, isGroup: false, opacity: 1, blendMode: 'normal' };
     documentStore.setState({

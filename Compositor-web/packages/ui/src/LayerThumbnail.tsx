@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Folder } from '@phosphor-icons/react';
 import { useStore } from 'zustand';
-import { documentStore, type Layer } from '@compositor/model';
+import { documentStore, transformRadians, type Layer } from '@compositor/model';
 import { fittedSize, renderThumbnail } from './thumbnail.js';
 
 /**
@@ -91,7 +91,7 @@ export const LayerThumbnail = ({ layer, highlighted }: LayerThumbnailProps): Rea
       (transform.origin.x + transform.size.width / 2) * scale,
       (transform.origin.y + transform.size.height / 2) * scale,
     );
-    context.rotate(transform.radians);
+    context.rotate(transformRadians(transform));
     context.scale(transform.flipX ? -1 : 1, transform.flipY ? -1 : 1);
     context.imageSmoothingQuality = 'high';
     context.drawImage(image, -width / 2, -height / 2, width, height);

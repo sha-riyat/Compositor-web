@@ -51,7 +51,7 @@ const centre = (specs: readonly Spec[]): Promise<number[]> =>
       return {
         id: `c${index}`, name: `c${index}`, asset, parentId: null, isGroup: false,
         isVisible: spec.visible ?? true, opacity: spec.opacity ?? 1, blendMode: spec.mode ?? 'normal',
-        transform: { origin: { x: 0, y: 0 }, size: { width: 8, height: 8 }, radians: 0, flipX: false, flipY: false, sampling: 'nearest' },
+        transform: { origin: { x: 0, y: 0 }, size: { width: 8, height: 8 }, rotation: 0, flipX: false, flipY: false, sampling: 'nearest' },
       };
     });
     const document = { id: 'p', width: 8, height: 8, resolution: 72, layers };
@@ -137,7 +137,7 @@ const oneLayer = (): Promise<void> =>
         id: 'q', width: 4, height: 4, resolution: 72,
         layers: [{
           id: 'g', name: 'Gris', asset, parentId: null, isGroup: false, isVisible: true, opacity: 1, blendMode: 'normal',
-          transform: { origin: { x: 0, y: 0 }, size: { width: 4, height: 4 }, radians: 0, flipX: false, flipY: false, sampling: 'linear' },
+          transform: { origin: { x: 0, y: 0 }, size: { width: 4, height: 4 }, rotation: 0, flipX: false, flipY: false, sampling: 'linear' },
         }],
       },
       activeLayerId: 'g',

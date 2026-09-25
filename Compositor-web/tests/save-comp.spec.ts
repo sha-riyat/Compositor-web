@@ -36,9 +36,9 @@ const setUp = async (page: Page): Promise<number[]> => {
         id: 'doc', width: 320, height: 200, resolution: 300,
         layers: [
           { ...base, id: uuid, name: 'Dégradé', asset, opacity: 0.5, blendMode: 'hardLight',
-            transform: { origin: { x: 12, y: 8 }, size: { width: 64, height: 64 }, radians: Math.PI, flipX: false, flipY: true, sampling: 'nearest' } },
+            transform: { origin: { x: 12, y: 8 }, size: { width: 64, height: 64 }, rotation: 180, flipX: false, flipY: true, sampling: 'nearest' } },
           { ...base, id: 'vide', name: 'Calque 1', asset: null, opacity: 1, blendMode: 'normal',
-            transform: { origin: { x: 0, y: 0 }, size: { width: 320, height: 200 }, radians: 0, flipX: false, flipY: false, sampling: 'high' } },
+            transform: { origin: { x: 0, y: 0 }, size: { width: 320, height: 200 }, rotation: 0, flipX: false, flipY: false, sampling: 'high' } },
         ],
       },
       activeLayerId: uuid,

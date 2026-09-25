@@ -16,7 +16,7 @@ const sample = (): CompositorDocument => {
   let doc = createDocument('document-de-test', 800, 600, 144);
   doc = addLayer(doc, createLayer(UUID_A, 'Photo', {
     ...identityTransform({ width: 400, height: 300 }, { x: 10.5, y: -20 }),
-    radians: Math.PI / 2,
+    rotation: 90,
     flipX: true,
     sampling: 'linear',
   }, 'asset-1'));

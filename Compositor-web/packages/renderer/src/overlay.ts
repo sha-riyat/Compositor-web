@@ -80,7 +80,7 @@ export class TransformOverlay {
       mat3ForTransform({
         origin: { x, y },
         size: { width: w, height: h },
-        radians: 0,
+        rotation: 0,
         flipX: false,
         flipY: false,
         sampling: 'nearest',

@@ -330,7 +330,7 @@ export class Compositor {
       mat3ForTransform({
         origin: { x: 0, y: 0 },
         size: { width: document.width, height: document.height },
-        radians: 0,
+        rotation: 0,
         flipX: false,
         flipY: false,
         sampling: 'nearest',

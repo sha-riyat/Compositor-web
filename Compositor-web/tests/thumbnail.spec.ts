@@ -28,7 +28,7 @@ const setUp = (): Promise<void> =>
     for (let i = 0; i < data.length; i += 4) data.set([255, 0, 0, 255], i);
     const red = documentStore.getState().assets.add({ width: 100, height: 100, data, isOpaque: true });
     const transform = (width: number, height: number) => ({
-      origin: { x: 0, y: 0 }, size: { width, height }, radians: 0, flipX: false, flipY: false, sampling: 'linear',
+      origin: { x: 0, y: 0 }, size: { width, height }, rotation: 0, flipX: false, flipY: false, sampling: 'linear',
     });
     const base = { isVisible: true, parentId: null, isGroup: false, opacity: 1, blendMode: 'normal' };
     documentStore.setState({

@@ -46,13 +46,6 @@ const identifiers = (): ((id: string) => string) => {
   };
 };
 
-/** Radians vers degrés, sans la poussière flottante d'un aller-retour. */
-const degrees = (radians: number): number => {
-  const value = (radians * 180) / Math.PI;
-  const whole = Math.round(value);
-  return Math.abs(value - whole) < 1e-9 ? whole : value;
-};
-
 export const buildManifest = (
   document: CompositorDocument,
   activeLayerId: LayerId | null,
@@ -60,7 +53,7 @@ export const buildManifest = (
 ): Manifest => {
   const layers: ManifestLayer[] = document.layers.map((layer) => {
     const id = toId(layer.id);
-    const { origin, size, radians, flipX, flipY, sampling } = layer.transform;
+    const { origin, size, rotation, flipX, flipY, sampling } = layer.transform;
     return {
       id,
       name: layer.name,
@@ -68,7 +61,7 @@ export const buildManifest = (
       transform: {
         origin: [origin.x, origin.y],
         size: [size.width, size.height],
-        rotation: degrees(radians),
+        rotation,
         flipX,
         flipY,
         sampling: SAMPLING_NAMES[sampling],

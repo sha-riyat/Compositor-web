@@ -204,7 +204,7 @@ export const sameDocument = (a: CompositorDocument | null, b: CompositorDocument
       layer.opacity === other.opacity && layer.blendMode === other.blendMode &&
       t.origin.x === u.origin.x && t.origin.y === u.origin.y &&
       t.size.width === u.size.width && t.size.height === u.size.height &&
-      t.radians === u.radians && t.flipX === u.flipX && t.flipY === u.flipY && t.sampling === u.sampling
+      t.rotation === u.rotation && t.flipX === u.flipX && t.flipY === u.flipY && t.sampling === u.sampling
     );
   });
 };

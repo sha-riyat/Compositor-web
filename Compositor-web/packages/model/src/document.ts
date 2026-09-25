@@ -1,5 +1,5 @@
 import type { Layer, LayerId } from './layer.js';
-import { transformContains } from './geometry.js';
+import { transformContains, transformRadians } from './geometry.js';
 import type { AssetStore } from './assets.js';
 
 /**
@@ -106,7 +106,7 @@ export const isDocumentOpaque = (
       origin.y <= 0 &&
       origin.x + size.width >= document.width &&
       origin.y + size.height >= document.height;
-    if (!covers || layer.transform.radians !== 0) return false;
+    if (!covers || transformRadians(layer.transform) !== 0) return false;
 
     return assets.get(layer.asset)?.isOpaque === true;
   });

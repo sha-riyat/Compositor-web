@@ -1,4 +1,4 @@
-import type { Transform } from '@compositor/model';
+import { transformRadians, type Transform } from '@compositor/model';
 
 /** Matrice 3×3 en colonne majeure, telle que l'attend `uniformMatrix3fv`. */
 export type Mat3 = Float32Array;
@@ -49,7 +49,7 @@ export const mat3ForTransform = (transform: Transform): Mat3 => {
   const centerY = origin.y + size.height / 2;
 
   let m = mat3Translate(centerX, centerY);
-  m = mat3Multiply(m, mat3Rotate(transform.radians));
+  m = mat3Multiply(m, mat3Rotate(transformRadians(transform)));
   m = mat3Multiply(
     m,
     mat3Scale(

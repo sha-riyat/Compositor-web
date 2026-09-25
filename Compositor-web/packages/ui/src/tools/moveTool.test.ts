@@ -5,6 +5,7 @@ import {
   createLayer,
   identityTransform,
   roundTransform,
+  transformRadians,
   rounded,
   type CompositorDocument,
   type Point,
@@ -79,7 +80,7 @@ describe('redimensionnement', () => {
 
   test('le redimensionnement est non destructif : rien d’autre que le placement ne bouge', () => {
     const out = resizeTransform(base, 'se', { x: 20, y: 10 }, false);
-    expect(out.radians).toBe(base.radians);
+    expect(out.rotation).toBe(base.rotation);
     expect(out.flipX).toBe(base.flipX);
     expect(out.flipY).toBe(base.flipY);
     expect(out.sampling).toBe(base.sampling);
@@ -98,12 +99,12 @@ describe('pixels entiers', () => {
   test('roundTransform arrondit position, taille et angle, sans taille nulle', () => {
     const out = roundTransform({
       ...identityTransform({ width: 0.3, height: 99.6 }, { x: 103.39583333333331, y: -0.5 }),
-      radians: (29.6 * Math.PI) / 180,
+      rotation: 29.6,
     });
     // Comme `.rounded()` en Swift : -0,5 s'éloigne de zéro.
     expect(out.origin).toEqual({ x: 103, y: -1 });
     expect(out.size).toEqual({ width: 1, height: 100 });
-    expect((out.radians * 180) / Math.PI).toBeCloseTo(30, 10);
+    expect(out.rotation).toBe(30);
   });
 
   test('les demis s’arrondissent loin de zéro, comme en Swift', () => {
@@ -154,5 +155,16 @@ describe('pixels entiers', () => {
     const out = drive({ x: 110, y: 70 }, [{ x: 123.7, y: 81.4 }]);
     expect(out.size).toEqual({ width: 114, height: 61 });
     expect(out.origin).toEqual({ x: 10, y: 20 });
+  });
+});
+
+/** `LayerTransform.radians` : `rotation.truncatingRemainder(dividingBy: 360) * .pi / 180`. */
+describe('les radians, calculés au dessin', () => {
+  const at = (rotation: number) => transformRadians({ ...identityTransform({ width: 1, height: 1 }), rotation });
+  test('un tour de plus ne change rien, et le signe suit l’angle', () => {
+    expect(at(90)).toBeCloseTo(Math.PI / 2, 12);
+    expect(at(450)).toBeCloseTo(Math.PI / 2, 12);
+    expect(at(-90)).toBeCloseTo(-Math.PI / 2, 12);
+    expect(at(360)).toBe(0);
   });
 });
