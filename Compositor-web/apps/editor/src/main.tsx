@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { documentStore, uiStore } from '@compositor/model';
+import { documentStore, historyDetails, uiStore } from '@compositor/model';
 import { Editor } from '@compositor/ui';
 import './styles.css';
 
@@ -9,7 +9,7 @@ import './styles.css';
  * depuis les tests d'interface. Rien de tout cela n'existe en production.
  */
 if (import.meta.env.DEV) {
-  Object.assign(window, { __compositor: { documentStore, uiStore } });
+  Object.assign(window, { __compositor: { documentStore, uiStore, historyDetails } });
 }
 
 /**
