@@ -7,7 +7,7 @@ import type {
   ToolEvent,
   Transform,
 } from '@compositor/model';
-import { replaceLayer, topmostLayerAt, transformContains } from '@compositor/model';
+import { replaceLayer, roundTransform, topmostLayerAt, transformContains } from '@compositor/model';
 
 /**
  * Le premier outil concret — il valide la signature de `ToolApi`.
@@ -221,10 +221,12 @@ export const createMoveTool = (options: MoveToolOptions): Tool => {
       };
       const { handle, startTransform, layerId } = drag;
 
+      // Comme l'original, un glissement pose le calque sur des pixels entiers
+      // à chaque mise à jour ; seules les valeurs tapées restent exactes.
       api.mutate((document) =>
         replaceLayer(document, layerId, (layer) => ({
           ...layer,
-          transform:
+          transform: roundTransform(
             handle === null
               ? {
                   ...startTransform,
@@ -240,6 +242,7 @@ export const createMoveTool = (options: MoveToolOptions): Tool => {
                   // Maj inverse le comportement par défaut du verrouillage.
                   options.lockRatioByDefault() !== event.shiftKey,
                 ),
+          ),
         })),
       );
       api.requestRedraw();
