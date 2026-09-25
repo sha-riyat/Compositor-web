@@ -243,18 +243,25 @@ export const Editor = (): React.ReactElement => {
         <LayerList />
       </div>
 
-      <footer className="flex h-control-lg shrink-0 items-center gap-3 border-t border-(--color-border) bg-(--color-panel) px-2 text-ui text-(--color-fg-muted)">
-        <span className="numeric">{formatZoom(viewport.scale)}</span>
+      {/* Une seule ligne, toujours : un message long se tronque — il reste
+          lisible en entier au survol — au lieu de faire passer le zoom sur
+          deux lignes. */}
+      <footer className="flex h-control-lg shrink-0 items-center gap-3 overflow-hidden whitespace-nowrap border-t border-(--color-border) bg-(--color-panel) px-2 text-ui text-(--color-fg-muted)">
+        <span className="numeric shrink-0">{formatZoom(viewport.scale)}</span>
         {document !== null && (
-          <span className="numeric">
+          <span className="numeric shrink-0">
             {formatPixels(document.width)} × {formatPixels(document.height)} px ·{' '}
             {document.resolution} ppp
           </span>
         )}
-        <span>{colourSpaceLabel}</span>
-        {message !== null && <span className="text-(--color-fg)">{message}</span>}
+        <span className="shrink-0">{colourSpaceLabel}</span>
+        {message !== null && (
+          <span role="status" title={message} className="min-w-0 truncate text-(--color-fg)">
+            {message}
+          </span>
+        )}
         <div className="flex-1" />
-        <span className="truncate text-(--color-fg-faint)">{TOOL_HINTS[tool] ?? ''}</span>
+        <span className="min-w-0 truncate text-(--color-fg-faint)">{TOOL_HINTS[tool] ?? ''}</span>
       </footer>
     </div>
   );
