@@ -217,7 +217,7 @@ export const LayerList = (): React.ReactElement => {
 
       {rows.length === 0 ? (
         <p className="p-3 text-ui text-(--color-fg-faint)">
-          Déposez une image PNG sur le canevas.
+          Déposez une image PNG ou un projet .comp sur le canevas.
         </p>
       ) : (
         <div

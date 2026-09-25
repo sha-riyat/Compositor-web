@@ -36,18 +36,21 @@ export const download = (blob: Blob, name: string): void => {
 };
 
 /**
- * Ctrl+S — Cmd+S sur Mac. Intercepté même dans un champ de texte : sinon le
- * navigateur proposerait d'enregistrer la page web.
+ * Ctrl+S et Ctrl+O — Cmd sur Mac, comme « Save » et « Open » dans l'original.
+ * Interceptés même dans un champ de texte : sinon le navigateur proposerait
+ * d'enregistrer la page web, ou d'ouvrir un fichier dans l'onglet.
  */
-export const useSaveShortcut = (onSave: () => void): void => {
+export const useFileShortcuts = (onSave: () => void, onOpen: () => void): void => {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
-      if (event.key.toLowerCase() !== 's') return;
+      const key = event.key.toLowerCase();
+      if (key !== 's' && key !== 'o') return;
       event.preventDefault();
-      onSave();
+      if (key === 's') onSave();
+      else onOpen();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onSave]);
+  }, [onSave, onOpen]);
 };
