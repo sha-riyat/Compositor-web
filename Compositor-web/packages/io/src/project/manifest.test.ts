@@ -79,6 +79,12 @@ describe('le manifeste écrit', () => {
     expect('activeLayerID' in buildManifest(sample(), null)).toBe(false);
   });
 
+  /** `LayerTransform.sampling` vaut `.high` par défaut dans l'original. */
+  test('un calque neuf s’enregistre en « High quality », comme sur Mac', () => {
+    const doc = addLayer(createDocument('d', 10, 10), createLayer(UUID_B, 'Neuf', identityTransform({ width: 10, height: 10 })));
+    expect(layerOf(buildManifest(doc, null), 0).transform.sampling).toBe('High quality');
+  });
+
   test('les 24 modes ont chacun leur nom', () => {
     expect(new Set(Object.values(BLEND_MODE_NAMES)).size).toBe(24);
   });

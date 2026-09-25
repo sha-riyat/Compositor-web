@@ -37,13 +37,18 @@ export interface Transform {
   readonly sampling: Sampling;
 }
 
+/**
+ * Le placement d'un calque neuf. L'échantillonnage vaut « High quality »,
+ * la valeur par défaut de `LayerTransform` dans l'original : un calque importé
+ * ou vide doit s'enregistrer comme le Mac l'enregistrerait.
+ */
 export const identityTransform = (size: Size, origin: Point = { x: 0, y: 0 }): Transform => ({
   origin,
   size,
   radians: 0,
   flipX: false,
   flipY: false,
-  sampling: 'linear',
+  sampling: 'high',
 });
 
 /**
