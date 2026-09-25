@@ -23,6 +23,7 @@ import { ToolRail } from './ToolRail.js';
 import { ToolHeader } from './ToolHeader.js';
 import { useAppearanceShortcuts } from './useAppearanceShortcuts.js';
 import { useHistoryShortcuts } from './useHistoryShortcuts.js';
+import { saveProject, useSaveShortcut } from './saveProject.js';
 import { createMoveTool } from './tools/moveTool.js';
 
 /**
@@ -106,6 +107,13 @@ export const Editor = (): React.ReactElement => {
     }
   }, []);
 
+  const save = useCallback((): void => {
+    void saveProject().then((error) => {
+      if (error !== null) setMessage(error);
+    });
+  }, []);
+  useSaveShortcut(save);
+
   const exportPNG = useCallback(async (): Promise<void> => {
     const current = documentStore.getState().document;
     const compositor = compositorRef.current;
@@ -148,6 +156,13 @@ export const Editor = (): React.ReactElement => {
         <span className="text-ui-lg font-semibold">Compositor</span>
         <span className="text-ui text-(--color-fg-faint)">T1 — squelette</span>
         <div className="flex-1" />
+        <Button
+          isDisabled={document === null}
+          onPress={save}
+          className="h-control rounded-sm border border-(--color-border) bg-(--color-panel-raised) px-2 text-ui data-hovered:bg-(--color-border) data-disabled:opacity-40"
+        >
+          Enregistrer
+        </Button>
         <Button
           isDisabled={document === null}
           onPress={() => void exportPNG()}
