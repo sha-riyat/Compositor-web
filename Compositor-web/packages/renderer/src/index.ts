@@ -5,3 +5,4 @@ export * from './target.js';
 export * from './blend.js';
 export * from './overlay.js';
 export * from './compositor.js';
+export * from './strokePreview.js';

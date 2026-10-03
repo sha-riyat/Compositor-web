@@ -124,3 +124,22 @@ export const rectUnion = (a: Rect, b: Rect): Rect => {
   const maxY = Math.max(a.y + a.height, b.y + b.height);
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 };
+
+/**
+ * Un point du document, ramené en pixels de l'image d'un calque de
+ * `width` × `height` pixels — l'inverse exact de `mat3ForTransform` : centre,
+ * rotation, retournements, puis mise à l'échelle.
+ */
+export const toLayerPixels = (t: Transform, width: number, height: number, p: Point): Point => {
+  const c = transformCenter(t);
+  const dx = p.x - c.x;
+  const dy = p.y - c.y;
+  const cos = Math.cos(-transformRadians(t));
+  const sin = Math.sin(-transformRadians(t));
+  const lx = dx * cos - dy * sin;
+  const ly = dx * sin + dy * cos;
+  return {
+    x: ((t.flipX ? -lx : lx) / t.size.width + 0.5) * width,
+    y: ((t.flipY ? -ly : ly) / t.size.height + 0.5) * height,
+  };
+};

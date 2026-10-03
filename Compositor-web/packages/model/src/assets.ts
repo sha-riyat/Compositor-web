@@ -1,4 +1,5 @@
 import type { AssetId } from './layer.js';
+import { materialize, type PixelSource, type TiledRaster } from './raster.js';
 
 /**
  * Les pixels d'un calque, côté CPU.
@@ -30,7 +31,10 @@ export interface PixelBuffer {
 }
 
 interface Entry {
-  readonly buffer: PixelBuffer;
+  /** L'image contiguë : celle d'un import, ou un raster matérialisé à la demande. */
+  buffer: PixelBuffer | null;
+  /** Le raster tuilé d'un calque peint ; `null` pour une image contiguë. */
+  readonly raster: TiledRaster | null;
   /** Incrémentée à chaque écriture : les caches s'en servent pour s'invalider. */
   revision: number;
 }
@@ -54,12 +58,37 @@ export class AssetStore {
 
   add(buffer: PixelBuffer): AssetId {
     const id = `asset-${this.#nextId++}`;
-    this.#entries.set(id, { buffer, revision: 1 });
+    this.#entries.set(id, { buffer, raster: null, revision: 1 });
     return id;
   }
 
+  /** Un raster tuilé, issu d'un trait. Immuable, comme une image importée. */
+  addRaster(raster: TiledRaster): AssetId {
+    const id = `asset-${this.#nextId++}`;
+    this.#entries.set(id, { buffer: null, raster, revision: 1 });
+    return id;
+  }
+
+  /**
+   * L'image contiguë. Un raster tuilé n'est assemblé qu'ici, à la première
+   * demande — export, enregistrement, miniature —, jamais au relâchement.
+   */
   get(id: AssetId): PixelBuffer | undefined {
-    return this.#entries.get(id)?.buffer;
+    const entry = this.#entries.get(id);
+    if (entry === undefined) return undefined;
+    entry.buffer ??= materialize(entry.raster!);
+    return entry.buffer;
+  }
+
+  /** Les pixels tels qu'ils sont rangés, sans rien assembler : le GPU et la brosse lisent ceci. */
+  source(id: AssetId): PixelSource | undefined {
+    const entry = this.#entries.get(id);
+    return entry === undefined ? undefined : (entry.raster ?? entry.buffer!);
+  }
+
+  /** Dimensions en pixels, sans rien assembler. */
+  dimensions(id: AssetId): { width: number; height: number } | undefined {
+    return this.source(id);
   }
 
   revision(id: AssetId): number {
@@ -85,7 +114,11 @@ export class AssetStore {
 
   /** Taille en octets d'un actif, `0` s'il n'existe plus. */
   bytesOf(id: AssetId): number {
-    return this.#entries.get(id)?.buffer.data.byteLength ?? 0;
+    const entry = this.#entries.get(id);
+    if (entry === undefined) return 0;
+    // Un raster ne compte que ce qu'il apporte : ses tuiles partagées sont
+    // déjà comptées par l'actif dont il dérive.
+    return entry.raster !== null ? entry.raster.ownBytes : entry.buffer!.data.byteLength;
   }
 
   get size(): number {
@@ -95,7 +128,9 @@ export class AssetStore {
   /** Octets détenus, pour le budget mémoire (le GPU n'est pas interrogeable). */
   get byteLength(): number {
     let total = 0;
-    for (const entry of this.#entries.values()) total += entry.buffer.data.byteLength;
+    for (const entry of this.#entries.values()) {
+      total += entry.raster !== null ? entry.raster.ownBytes : entry.buffer!.data.byteLength;
+    }
     return total;
   }
 

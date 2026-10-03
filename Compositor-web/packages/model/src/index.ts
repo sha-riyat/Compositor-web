@@ -10,3 +10,6 @@ export * from './viewport.js';
 export * from './history.js';
 export * from './session.js';
 export * from './ids.js';
+export * from './raster.js';
+export * from './brush.js';
+export * from './paint.js';

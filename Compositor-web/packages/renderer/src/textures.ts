@@ -1,5 +1,5 @@
-import type { AssetId, AssetStore } from '@compositor/model';
-import { LIMITS } from '@compositor/model';
+import type { AssetId, AssetStore, PixelSource } from '@compositor/model';
+import { isTiled, LIMITS, tileRect } from '@compositor/model';
 
 /**
  * Le cache de textures : **le GPU n'est qu'un cache** (invariant ④).
@@ -39,14 +39,14 @@ export class TextureCache {
   }
 
   get(id: AssetId): Entry | undefined {
-    const buffer = this.#assets.get(id);
-    if (buffer === undefined) return undefined;
+    const source = this.#assets.source(id);
+    if (source === undefined) return undefined;
 
     const revision = this.#assets.revision(id);
     const existing = this.#entries.get(id);
     if (existing !== undefined) {
       if (existing.revision === revision) return existing;
-      this.#upload(existing.texture, buffer.width, buffer.height, buffer.data);
+      this.#upload(existing.texture, source);
       existing.revision = revision;
       return existing;
     }
@@ -54,38 +54,51 @@ export class TextureCache {
     const gl = this.#gl;
     const texture = gl.createTexture();
     if (texture === null) return undefined;
-    this.#upload(texture, buffer.width, buffer.height, buffer.data);
+    this.#upload(texture, source);
 
-    const entry: Entry = { texture, width: buffer.width, height: buffer.height, revision };
+    const entry: Entry = { texture, width: source.width, height: source.height, revision };
     this.#entries.set(id, entry);
     return entry;
   }
 
-  #upload(
-    texture: WebGLTexture,
-    width: number,
-    height: number,
-    data: Uint8ClampedArray<ArrayBuffer>,
-  ): void {
+  /**
+   * Reprend une texture déjà à jour sous un nouvel actif — celle de l'aperçu
+   * d'un trait, qui contient exactement le raster qu'il vient de produire.
+   * Sans cela, chaque relâchement retéléverserait tout le calque.
+   */
+  adopt(id: AssetId, texture: WebGLTexture, width: number, height: number): void {
+    this.release(id);
+    this.#entries.set(id, { texture, width, height, revision: this.#assets.revision(id) });
+  }
+
+  /**
+   * Un raster tuilé n'est jamais assemblé pour le GPU : la base d'abord,
+   * puis chaque tuile repeinte à sa place.
+   */
+  #upload(texture: WebGLTexture, source: PixelSource): void {
     const gl = this.#gl;
     gl.bindTexture(gl.TEXTURE_2D, texture);
+    const base = isTiled(source) ? source.base : source;
     // `RGBA8` et non `SRGB8_ALPHA8` : on compose dans l'espace où les octets
     // sont écrits, sans décodage vers le linéaire (invariant ①).
     gl.texImage2D(
       gl.TEXTURE_2D,
       0,
       gl.RGBA8,
-      width,
-      height,
+      source.width,
+      source.height,
       0,
       gl.RGBA,
       gl.UNSIGNED_BYTE,
-      new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+      base === null ? null : new Uint8Array(base.data.buffer, base.data.byteOffset, base.data.byteLength),
     );
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    if (isTiled(source)) {
+      for (const [key, tile] of source.tiles) {
+        const rect = tileRect(source.width, source.height, key);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, rect.x, rect.y, rect.width, rect.height, gl.RGBA, gl.UNSIGNED_BYTE, tile);
+      }
+    }
+    setTextureParameters(gl);
     // La pyramide tient lieu des « halvings nets » de `DownsampleCache.swift` :
     // une réduction forte passe par des divisions par deux successives plutôt
     // que par un seul échantillonnage qui scintillerait.
@@ -114,3 +127,10 @@ export class TextureCache {
     this.#entries.clear();
   }
 }
+
+export const setTextureParameters = (gl: WebGL2RenderingContext): void => {
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+};

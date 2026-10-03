@@ -2,6 +2,7 @@ import { createStore } from 'zustand/vanilla';
 import type { CompositorDocument } from './document.js';
 import type { LayerId } from './layer.js';
 import { AssetStore } from './assets.js';
+import { DEFAULT_BRUSH, type BrushSettings } from './brush.js';
 
 /**
  * Deux stores séparés, reprenant la distinction `@Observable` /
@@ -83,6 +84,8 @@ export interface UIState {
   showsTransformBox: boolean;
   /** Verrouillé par défaut, comme `locksTransformRatio` dans le Swift. */
   locksTransformRatio: boolean;
+  /** Les réglages de la brosse, partagés par les outils à pointe. */
+  brush: BrushSettings;
 }
 
 export const uiStore = createStore<UIState>(() => ({
@@ -91,6 +94,7 @@ export const uiStore = createStore<UIState>(() => ({
   autoSelect: false,
   showsTransformBox: true,
   locksTransformRatio: true,
+  brush: DEFAULT_BRUSH,
 }));
 
 export const setDocument = (document: CompositorDocument | null): void => {

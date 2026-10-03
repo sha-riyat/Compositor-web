@@ -21,6 +21,7 @@ import {
   watchDevicePixelRatio,
 } from '@compositor/renderer';
 import { getBlendPreview, subscribeBlendPreview } from './blendPreview.js';
+import { noteFrame, noteInput } from './latency.js';
 
 /**
  * Le canevas. **Il n'est jamais rendu par React** : React monte l'élément une
@@ -34,13 +35,17 @@ import { getBlendPreview, subscribeBlendPreview } from './blendPreview.js';
 export interface CanvasViewProps {
   readonly tool: Tool;
   onCompositorReady?(compositor: Compositor): void;
+  /** Un message d'outil pour la barre d'état. */
+  onMessage?(message: string): void;
 }
 
-export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.ReactElement => {
+export const CanvasView = ({ tool, onCompositorReady, onMessage }: CanvasViewProps): React.ReactElement => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // L'outil change sans que le canevas soit remonté : on le lit via une réf.
   const toolRef = useRef(tool);
   toolRef.current = tool;
+  const messageRef = useRef(onMessage);
+  messageRef.current = onMessage;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -60,12 +65,15 @@ export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.
       resizeToDisplay(context);
       const { document, activeLayerId } = documentStore.getState();
       const ui = uiStore.getState();
+      const start = performance.now();
       compositor.render(
         document,
         ui.viewport,
-        { activeLayerId, showsTransformBox: ui.showsTransformBox },
+        { activeLayerId, showsTransformBox: ui.showsTransformBox && ui.tool === 'move' },
         getBlendPreview(),
       );
+      const end = performance.now();
+      noteFrame(end, end - start);
     };
 
     const requestRedraw = (): void => {
@@ -90,6 +98,10 @@ export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.
       get activeLayerId(): string | null {
         return documentStore.getState().activeLayerId;
       },
+      get selectedLayerIds(): readonly string[] {
+        return documentStore.getState().selectedLayerIds;
+      },
+      assets,
       beginHistory(name: string): void {
         beginEdit(name);
       },
@@ -114,6 +126,14 @@ export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.
       },
       requestRedraw,
       toDocument,
+      beginStroke: (layerId, asset, width, height) => compositor.strokes.begin(layerId, asset, width, height),
+      updateStroke: (tiles) => compositor.strokes.update(tiles),
+      commitStroke: (asset) => compositor.strokes.commit(asset),
+      cancelStroke: () => {
+        compositor.strokes.cancel();
+        requestRedraw();
+      },
+      notify: (message) => messageRef.current?.(message),
     };
 
     const toolEvent = (event: PointerEvent): ToolEvent => ({
@@ -155,7 +175,10 @@ export const CanvasView = ({ tool, onCompositorReady }: CanvasViewProps): React.
           ? event.getCoalescedEvents()
           : [event];
       const tool = toolRef.current;
+      const start = performance.now();
       for (const sample of samples) tool.onPointerMove(toolEvent(sample), api);
+      tool.onInputBatchEnd?.(api);
+      if (canvas.hasPointerCapture(event.pointerId)) noteInput(event.timeStamp, performance.now() - start);
       requestRedraw();
     };
 

@@ -2,6 +2,7 @@ import type { AssetStore, BlendMode, CompositorDocument } from '@compositor/mode
 import { effectiveOpacity, isEffectivelyVisible, layersById } from '@compositor/model';
 import { createProgram, type RenderContext } from './context.js';
 import { TextureCache } from './textures.js';
+import { StrokePreview } from './strokePreview.js';
 import { TransformOverlay } from './overlay.js';
 import { RenderTarget } from './target.js';
 import {
@@ -104,6 +105,8 @@ const FULL_TARGET = mat3Multiply(mat3Translate(-1, -1), mat3Scale(2, 2));
 export class Compositor {
   #context: RenderContext;
   #textures: TextureCache;
+  /** L'aperçu du trait de brosse en cours, s'il y en a un. */
+  readonly strokes: StrokePreview;
   #overlay: TransformOverlay;
   #ping: RenderTarget;
   #pong: RenderTarget;
@@ -128,6 +131,7 @@ export class Compositor {
   constructor(context: RenderContext, assets: AssetStore) {
     this.#context = context;
     this.#textures = new TextureCache(context.gl, assets);
+    this.strokes = new StrokePreview(context.gl, this.#textures);
 
     const gl = context.gl;
     this.#program = createProgram(gl, VERTEX_SOURCE, FRAGMENT_SOURCE);
@@ -242,13 +246,15 @@ export class Compositor {
     const byId = layersById(document);
 
     for (const layer of document.layers) {
-      if (layer.isGroup || layer.asset === null) continue;
+      if (layer.isGroup) continue;
       if (!isEffectivelyVisible(layer, byId)) continue;
 
       const opacity = effectiveOpacity(layer, byId);
       if (opacity <= 0) continue;
 
-      const entry = this.#textures.get(layer.asset);
+      // Un calque en train d'être peint — même vide — se dessine depuis l'aperçu.
+      const entry =
+        this.strokes.textureFor(layer.id) ?? (layer.asset === null ? undefined : this.#textures.get(layer.asset));
       if (entry === undefined) continue;
 
       const matrix = mat3Multiply(view, mat3ForTransform(layer.transform));
@@ -367,6 +373,7 @@ export class Compositor {
 
   dispose(): void {
     const gl = this.#context.gl;
+    this.strokes.cancel();
     this.#textures.clear();
     this.#overlay.dispose();
     this.#ping.dispose();

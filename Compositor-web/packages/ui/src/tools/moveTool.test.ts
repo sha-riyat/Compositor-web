@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   addLayer,
+  AssetStore,
   createDocument,
   createLayer,
   identityTransform,
@@ -123,6 +124,8 @@ describe('pixels entiers', () => {
         return document;
       },
       activeLayerId: 'l',
+      selectedLayerIds: ['l'],
+      assets: new AssetStore(),
       beginHistory: () => undefined,
       mutate: (fn) => {
         document = fn(document);
@@ -131,6 +134,11 @@ describe('pixels entiers', () => {
       selectLayer: () => undefined,
       requestRedraw: () => undefined,
       toDocument: (p) => p,
+      beginStroke: () => undefined,
+      updateStroke: () => undefined,
+      commitStroke: () => undefined,
+      cancelStroke: () => undefined,
+      notify: () => undefined,
     };
     const tool = createMoveTool({
       handleTolerance: () => 4,
