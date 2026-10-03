@@ -28,6 +28,9 @@ import { saveProject, useFileShortcuts } from './saveProject.js';
 import { filesFromBlob, openProject, projectFromDrop } from './openProject.js';
 import type { PackageFiles } from '@compositor/io';
 import { createMoveTool } from './tools/moveTool.js';
+import { createBrushTool } from './tools/brushTool.js';
+import { useToolShortcuts } from './useToolShortcuts.js';
+import { gestureTimings, resetGestureTimings, summarize } from './latency.js';
 import { fitToView } from './fitToView.js';
 import { startAutosave } from './autosave/autosave.js';
 import { DOCUMENT_TITLE, useHasUnsavedChanges, useUnsavedChangesGuard } from './unsavedChanges.js';
@@ -40,6 +43,7 @@ import { DOCUMENT_TITLE, useHasUnsavedChanges, useUnsavedChangesGuard } from './
 const TOOL_HINTS: Partial<Record<ToolId, string>> = {
   move:
     'Glisser pour déplacer · Poignée pour redimensionner · 1–0 opacité · Maj +/− mode · Molette pour déplacer la vue · Ctrl-molette pour zoomer',
+  brush: 'Glisser pour peindre · Ctrl+Z annule le trait entier',
   idle: 'Aucun outil actif',
 };
 
@@ -71,6 +75,8 @@ export const Editor = (): React.ReactElement => {
       }),
     [],
   );
+  const brushTool = useMemo(() => createBrushTool({ settings: () => uiStore.getState().brush }), []);
+  useToolShortcuts();
 
   const importFile = useCallback(async (file: File): Promise<void> => {
     setMessage(null);
@@ -231,7 +237,8 @@ export const Editor = (): React.ReactElement => {
 
         <main className="relative min-w-0 flex-1">
           <CanvasView
-            tool={moveTool}
+            tool={tool === 'brush' ? brushTool : moveTool}
+            onMessage={setMessage}
             onCompositorReady={(compositor) => {
               compositorRef.current = compositor;
               void startAutosave(compositor.maxSide).then((restored) => {
@@ -242,7 +249,13 @@ export const Editor = (): React.ReactElement => {
               // onglet masqué n'en reçoit pas.
               if (import.meta.env.DEV) {
                 const globals = window as unknown as { __compositor?: Record<string, unknown> };
-                globals.__compositor = { ...globals.__compositor, compositor };
+                globals.__compositor = {
+                  ...globals.__compositor,
+                  compositor,
+                  gestureTimings,
+                  resetGestureTimings,
+                  summarize,
+                };
               }
             }}
           />

@@ -52,7 +52,7 @@ const TOOLS: readonly Entry[] = [
   { id: 'lasso', label: 'Lasso (L)', Icon: Lasso, ready: false },
   { id: 'wand', label: 'Baguette magique (W)', Icon: MagicWand, ready: false },
   { id: 'crop', label: 'Recadrage (C)', Icon: Crop, ready: false },
-  { id: 'brush', label: 'Brosse (B)', Icon: PaintBrush, ready: false },
+  { id: 'brush', label: 'Brosse (B)', Icon: PaintBrush, ready: true },
   { id: 'spotHealing', label: 'Correcteur localisé (J)', Icon: Bandaids, ready: false },
   { id: 'cloneStamp', label: 'Tampon de duplication (S)', Icon: Stamp, ready: false },
   { id: 'blur', label: 'Flou (R)', Icon: Drop, ready: false },

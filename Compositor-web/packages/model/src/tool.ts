@@ -1,6 +1,7 @@
 import type { CompositorDocument } from './document.js';
 import type { Point } from './geometry.js';
-import type { LayerId } from './layer.js';
+import type { AssetId, LayerId } from './layer.js';
+import type { AssetStore } from './assets.js';
 import type { ToolId } from './store.js';
 
 /**
@@ -15,6 +16,9 @@ import type { ToolId } from './store.js';
 export interface ToolApi {
   readonly document: CompositorDocument | null;
   readonly activeLayerId: LayerId | null;
+  readonly selectedLayerIds: readonly LayerId[];
+  /** Les pixels, en lecture ; un outil qui peint y ajoute son résultat, jamais ne le modifie. */
+  readonly assets: AssetStore;
 
   /**
    * Ouvre une transaction d'annulation. Les appels s'imbriquent : seul le
@@ -33,7 +37,19 @@ export interface ToolApi {
   /** Position du pointeur convertie en coordonnées document. */
   toDocument(client: Point): Point;
 
-  // paintTile(...) arrive en T4, avec le stockage pavé.
+  /**
+   * L'aperçu d'un trait (T4) : le document ne change qu'au relâchement. D'ici
+   * là, le calque est dessiné depuis une texture où seules les tuiles
+   * touchées sont téléversées.
+   */
+  beginStroke(layerId: LayerId, asset: AssetId | null, width: number, height: number): void;
+  updateStroke(tiles: ReadonlyMap<number, Uint8ClampedArray>): void;
+  /** À appeler une fois `asset` posé sur le calque : l'aperçu devient sa texture. */
+  commitStroke(asset: AssetId): void;
+  cancelStroke(): void;
+
+  /** Un message pour la barre d'état — pourquoi la brosse refuse, par exemple. */
+  notify(message: string): void;
 }
 
 export interface ToolEvent {
@@ -68,6 +84,11 @@ export interface Tool {
   onPointerDown(event: ToolEvent, api: ToolApi): void;
   onPointerMove(event: ToolEvent, api: ToolApi): void;
   onPointerUp(event: ToolEvent, api: ToolApi): void;
+  /**
+   * Après chaque lot d'échantillons d'un même événement (`getCoalescedEvents`) :
+   * un outil coûteux y fait une fois ce qu'il ne doit pas refaire par échantillon.
+   */
+  onInputBatchEnd?(api: ToolApi): void;
   /** Renvoie `true` si l'outil a consommé la touche. */
   onKey?(event: KeyboardEventLike, api: ToolApi): boolean;
   readonly options: readonly ToolOption[];
