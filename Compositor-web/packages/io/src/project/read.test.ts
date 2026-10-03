@@ -130,6 +130,17 @@ describe('ce qui est refusé', () => {
     expect(error.message).toMatch(/42/);
   });
 
+  /** Compositor 1.4.5 enregistre en version 11 ; 12 n'existe pas encore. */
+  test('les versions 10 et 11 du Mac s’ouvrent, la 12 est refusée', async () => {
+    for (const version of [10, 11]) {
+      const opened = await open(project(manifest({ version })));
+      expect(opened.document.layers).toHaveLength(1);
+    }
+    const error = await failure(() => open(project(manifest({ version: 12 }))));
+    expect(error.kind).toBe('version');
+    expect(error.message).toMatch(/1 à 11/);
+  });
+
   test('des métadonnées qui ne sont pas du JSON', async () => {
     const bytes = zip({ 'manifest.json': strToU8('not json'), images: {} });
     expect((await failure(() => open(bytes))).kind).toBe('invalid');
