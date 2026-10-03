@@ -29,6 +29,8 @@ import { filesFromBlob, openProject, projectFromDrop } from './openProject.js';
 import type { PackageFiles } from '@compositor/io';
 import { createMoveTool } from './tools/moveTool.js';
 import { fitToView } from './fitToView.js';
+import { startAutosave } from './autosave/autosave.js';
+import { DOCUMENT_TITLE, useHasUnsavedChanges, useUnsavedChangesGuard } from './unsavedChanges.js';
 
 /**
  * L'aide contextuelle de la barre d'état, reprise de l'application macOS : elle
@@ -52,6 +54,8 @@ export const Editor = (): React.ReactElement => {
   const compositorRef = useRef<Compositor | null>(null);
   useAppearanceShortcuts();
   useHistoryShortcuts();
+  useUnsavedChangesGuard();
+  const unsaved = useHasUnsavedChanges();
   const [message, setMessage] = useState<string | null>(null);
   const [isDropTarget, setIsDropTarget] = useState(false);
 
@@ -172,7 +176,19 @@ export const Editor = (): React.ReactElement => {
     >
       <header className="flex h-tool-header shrink-0 items-center gap-2 border-b border-(--color-border) bg-(--color-panel) px-2">
         <span className="text-ui-lg font-semibold">Compositor</span>
-        <span className="text-ui text-(--color-fg-faint)">T1 — squelette</span>
+        {document !== null && (
+          // Le point de 5 px de l'onglet de l'original, devant le titre.
+          <span className="flex min-w-0 items-center gap-[5px] text-ui text-(--color-fg-muted)">
+            {unsaved && (
+              <span
+                role="img"
+                aria-label="Modifications non enregistrées"
+                className="size-[5px] shrink-0 rounded-full bg-(--color-fg)"
+              />
+            )}
+            <span className="truncate">{DOCUMENT_TITLE}</span>
+          </span>
+        )}
         <div className="flex-1" />
         <input
           ref={picker}
@@ -218,6 +234,9 @@ export const Editor = (): React.ReactElement => {
             tool={moveTool}
             onCompositorReady={(compositor) => {
               compositorRef.current = compositor;
+              void startAutosave(compositor.maxSide).then((restored) => {
+                if (restored) setMessage('Document rétabli depuis la sauvegarde automatique.');
+              });
               // En développement seulement : la suite Playwright compose par
               // cette référence, sans dépendre d'une trame d'animation — un
               // onglet masqué n'en reçoit pas.

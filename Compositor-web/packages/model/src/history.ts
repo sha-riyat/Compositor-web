@@ -89,6 +89,14 @@ export class DocumentHistory {
     this.#savedRevision = this.#revision;
   }
 
+  /**
+   * L'état courant n'est enregistré nulle part — un document rétabli depuis
+   * la sauvegarde automatique. Aucune révision ne vaut `-1`.
+   */
+  markUnsaved(): void {
+    this.#savedRevision = -1;
+  }
+
   reset(): void {
     this.#past = [];
     this.#future = [];

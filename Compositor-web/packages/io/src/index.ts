@@ -5,3 +5,4 @@ export * from './project/manifest.js';
 export * from './project/write.js';
 export * from './project/read.js';
 export * from './png.js';
+export * from './project/autosave.js';
