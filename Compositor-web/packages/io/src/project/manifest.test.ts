@@ -30,7 +30,7 @@ describe('le manifeste écrit', () => {
   test('les champs de l’original, avec les valeurs attendues', () => {
     const manifest = buildManifest(sample(), UUID_A);
     expect(manifest.format).toBe('com.compositor.project');
-    expect(manifest.version).toBe(9);
+    expect(manifest.version).toBe(11);
     expect(manifest.colorSpace).toBe('sRGB');
     expect(manifest.resolution).toBe(144);
     expect([manifest.width, manifest.height]).toEqual([800, 600]);

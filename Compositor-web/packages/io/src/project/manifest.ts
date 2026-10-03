@@ -10,8 +10,12 @@ import type { BlendMode, Sampling } from '@compositor/model';
  */
 
 export const PROJECT_FORMAT = 'com.compositor.project';
-/** `ProjectManifest.current` : ce que les sauvegardes écrivent. */
-export const CURRENT_VERSION = 9;
+/**
+ * `ProjectManifest.current` : ce que les sauvegardes écrivent. Les versions 10
+ * et 11 n'ajoutent que des couleurs et des polices par lettre aux calques de
+ * texte, que la lecture refuse de toute façon (`refuseUnsupported`).
+ */
+export const CURRENT_VERSION = 11;
 /** `ProjectManifest.supported` : ce que la lecture accepte. */
 export const SUPPORTED_VERSIONS = { min: 1, max: CURRENT_VERSION } as const;
 
