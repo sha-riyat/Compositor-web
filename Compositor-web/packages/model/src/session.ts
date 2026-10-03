@@ -120,6 +120,11 @@ export const markSaved = (): void => {
   publish();
 };
 
+export const markUnsaved = (): void => {
+  history.markUnsaved();
+  publish();
+};
+
 /** Un historique vierge — à l'ouverture d'un projet, et entre deux tests. */
 export const resetHistory = (limits?: HistoryLimits): void => {
   history = new DocumentHistory(bytesOf, limits);

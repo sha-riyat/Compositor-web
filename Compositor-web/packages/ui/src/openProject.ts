@@ -11,6 +11,7 @@ import {
   packageRoot,
   ProjectError,
   readProject,
+  type OpenedProject,
   type PackageFile,
   type PackageFiles,
 } from '@compositor/io';
@@ -27,7 +28,7 @@ import { fitToView } from './fitToView.js';
 /** Un fichier est-il un projet plutôt qu'une image ? */
 export const isProjectFile = (file: File): boolean => /\.(comp|zip)$/i.test(file.name);
 
-const decodePNG = async (bytes: Uint8Array, maxSide: number): Promise<PixelBuffer> => {
+export const decodePNG = async (bytes: Uint8Array, maxSide: number): Promise<PixelBuffer> => {
   try {
     return await decodeImageFile(new File([new Uint8Array(bytes)], 'image.png', { type: 'image/png' }), maxSide);
   } catch (error) {
@@ -43,25 +44,29 @@ export const openProject = async (files: () => Promise<PackageFiles>, maxSide: n
     if (!proceed) return null;
   }
   try {
-    const project = await readProject(await files(), decodePNG, maxSide);
-    const { assets } = documentStore.getState();
-    const assetIds = new Map([...project.images].map(([layerId, buffer]) => [layerId, assets.add(buffer)]));
-    const document = {
-      ...project.document,
-      layers: project.document.layers.map((layer) => ({
-        ...layer,
-        asset: layer.asset === null ? null : (assetIds.get(layer.id) ?? null),
-      })),
-    };
-    documentStore.setState({ document });
-    setActiveLayer(project.activeLayerId);
-    // Un projet ouvert part d'un historique vierge et n'est pas « modifié ».
-    resetHistory();
-    fitToView(document);
+    installProject(await readProject(await files(), decodePNG, maxSide));
     return null;
   } catch (error) {
     return error instanceof ProjectError ? error.message : "Ce projet n'a pas pu être ouvert.";
   }
+};
+
+/** Remplace le document par un projet lu : historique vierge, calque actif, vue cadrée. */
+export const installProject = (project: OpenedProject): void => {
+  const { assets } = documentStore.getState();
+  const assetIds = new Map([...project.images].map(([layerId, buffer]) => [layerId, assets.add(buffer)]));
+  const document = {
+    ...project.document,
+    layers: project.document.layers.map((layer) => ({
+      ...layer,
+      asset: layer.asset === null ? null : (assetIds.get(layer.id) ?? null),
+    })),
+  };
+  documentStore.setState({ document });
+  setActiveLayer(project.activeLayerId);
+  // Un projet ouvert part d'un historique vierge et n'est pas « modifié ».
+  resetHistory();
+  fitToView(document);
 };
 
 export const filesFromBlob = (file: Blob): (() => Promise<PackageFiles>) => async () =>

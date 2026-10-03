@@ -14,6 +14,7 @@ import {
   identityTransform,
   insertBlankLayer,
   markSaved,
+  markUnsaved,
   moveLayer,
   redo,
   removeLayers,
@@ -146,6 +147,19 @@ describe('annuler et rétablir', () => {
     editDocument('Masquer le calque', (d) => setLayersVisible(d, ['l'], false));
     expect(historyStore.getState().canRedo).toBe(false);
     expect(historyStore.getState().isModified).toBe(true);
+  });
+
+  /** Un document rétabli de la sauvegarde automatique n'est enregistré nulle part. */
+  test('un document rétabli reste « modifié », même en revenant à son état de départ', () => {
+    documentStore.setState({ document: layerDoc('Calque 1') });
+    resetHistory();
+    markUnsaved();
+    expect(historyStore.getState().isModified).toBe(true);
+    editDocument('Renommer le calque', (d) => renameLayer(d, 'l', 'Changé'));
+    undo();
+    expect(historyStore.getState().isModified).toBe(true);
+    markSaved();
+    expect(historyStore.getState().isModified).toBe(false);
   });
 
   /** `replacementCanvasAndNestedTransactionsUndoAsOne`. */

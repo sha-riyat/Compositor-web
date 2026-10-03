@@ -1,6 +1,7 @@
 import { strToU8, zipSync, type Zippable } from 'fflate';
-import type { AssetStore, CompositorDocument, LayerId } from '@compositor/model';
-import { encodePNG } from '../export.js';
+import type { AssetId, AssetStore, CompositorDocument, LayerId, PixelBuffer } from '@compositor/model';
+import { unpremultiply } from '../alpha.js';
+import { encodePNGBytes } from '../png.js';
 import {
   BLEND_MODE_NAMES,
   CURRENT_VERSION,
@@ -99,11 +100,30 @@ export const encodeManifest = (manifest: Manifest): Uint8Array => {
   return strToU8(JSON.stringify(sorted(manifest), null, 2));
 };
 
-export const writeProject = async (
+/** Une image déjà encodée en PNG, avec ses dimensions pour les limites. */
+export interface EncodedImage {
+  readonly width: number;
+  readonly height: number;
+  readonly png: Uint8Array;
+}
+
+/** Les pixels prémultipliés d'un actif, en PNG à alpha droit. */
+export const encodeAsset = (buffer: PixelBuffer): EncodedImage => ({
+  width: buffer.width,
+  height: buffer.height,
+  png: encodePNGBytes(unpremultiply(buffer.data), buffer.width, buffer.height),
+});
+
+/**
+ * Assemble le paquet à partir d'images déjà encodées. La sauvegarde
+ * automatique s'en sert dans un worker, en gardant les PNG d'un passage à
+ * l'autre : seuls les calques modifiés sont réencodés.
+ */
+export const packProject = (
   document: CompositorDocument,
   activeLayerId: LayerId | null,
-  assets: AssetStore,
-): Promise<Uint8Array> => {
+  imageOf: (asset: AssetId) => EncodedImage | undefined,
+): Uint8Array => {
   const toId = identifiers();
   const manifest = buildManifest(document, activeLayerId, toId);
   validateManifest(manifest);
@@ -112,22 +132,18 @@ export const writeProject = async (
   let pixels = 0;
   for (const layer of document.layers) {
     if (layer.asset === null) continue;
-    const buffer = assets.get(layer.asset);
-    if (buffer === undefined) {
+    const image = imageOf(layer.asset);
+    if (image === undefined) {
       throw new ProjectError('missingImage', "Une image du document est introuvable. Le projet n'a pas été enregistré.");
     }
-    pixels += buffer.width * buffer.height;
-    if (buffer.width > MAX_SIDE || buffer.height > MAX_SIDE || pixels > MAX_PIXELS) {
+    pixels += image.width * image.height;
+    if (image.width > MAX_SIDE || image.height > MAX_SIDE || pixels > MAX_PIXELS) {
       throw new ProjectError('tooLarge', 'Ce projet dépasse la limite de 100 mégapixels ou de 30 000 px par côté.');
     }
-    // `encodePNG` attend des octets prémultipliés et écrit de l'alpha droit ;
-    // il travaille sur une copie.
-    const blob = await encodePNG(new Uint8ClampedArray(buffer.data), buffer.width, buffer.height);
-    const png = new Uint8Array(await blob.arrayBuffer());
-    if (png.byteLength > MAX_IMAGE_BYTES) {
+    if (image.png.byteLength > MAX_IMAGE_BYTES) {
       throw new ProjectError('tooLarge', 'Une image dépasse 512 Mio une fois encodée.');
     }
-    images[`${toId(layer.id)}.png`] = [png, { level: 0 }];
+    images[`${toId(layer.id)}.png`] = [image.png, { level: 0 }];
   }
 
   const metadata = encodeManifest(manifest);
@@ -136,3 +152,13 @@ export const writeProject = async (
   }
   return zipSync({ 'manifest.json': [metadata, { level: 6 }], images });
 };
+
+export const writeProject = async (
+  document: CompositorDocument,
+  activeLayerId: LayerId | null,
+  assets: AssetStore,
+): Promise<Uint8Array> =>
+  packProject(document, activeLayerId, (id) => {
+    const buffer = assets.get(id);
+    return buffer === undefined ? undefined : encodeAsset(buffer);
+  });

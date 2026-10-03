@@ -29,6 +29,7 @@ import { filesFromBlob, openProject, projectFromDrop } from './openProject.js';
 import type { PackageFiles } from '@compositor/io';
 import { createMoveTool } from './tools/moveTool.js';
 import { fitToView } from './fitToView.js';
+import { startAutosave } from './autosave/autosave.js';
 
 /**
  * L'aide contextuelle de la barre d'état, reprise de l'application macOS : elle
@@ -218,6 +219,9 @@ export const Editor = (): React.ReactElement => {
             tool={moveTool}
             onCompositorReady={(compositor) => {
               compositorRef.current = compositor;
+              void startAutosave(compositor.maxSide).then((restored) => {
+                if (restored) setMessage('Document rétabli depuis la sauvegarde automatique.');
+              });
               // En développement seulement : la suite Playwright compose par
               // cette référence, sans dépendre d'une trame d'animation — un
               // onglet masqué n'en reçoit pas.
