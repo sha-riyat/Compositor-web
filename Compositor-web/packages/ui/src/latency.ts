@@ -10,6 +10,13 @@
  *   recomposition et téléversement des tuiles. Le repère de l'original
  *   (`docs/brush-performance.md`) mesure la même chose.
  * - `render` : le dessin d'une image.
+ * - `release` : ce que le relâchement bloque, d'un bloc.
+ * - `settle` : du relâchement à l'entrée du raster dans le document — la
+ *   relecture des tuiles, répartie sur plusieurs images.
+ *
+ * `waitForGpu` fait attendre, à chaque image, que le GPU ait **fini** son
+ * travail : sans cela, la mesure s'arrête quand les commandes sont envoyées,
+ * et un GPU en retard passerait inaperçu.
  *
  * Seuls les gestes en cours — pointeur capturé — sont mesurés.
  */
@@ -18,11 +25,14 @@ export interface GestureTimings {
   readonly inputToFrame: number[];
   readonly update: number[];
   readonly render: number[];
+  readonly release: number[];
+  readonly settle: number[];
+  waitForGpu: boolean;
 }
 
 const LIMIT = 5_000;
 
-export const gestureTimings: GestureTimings = { inputToFrame: [], update: [], render: [] };
+export const gestureTimings: GestureTimings = { inputToFrame: [], update: [], render: [], release: [], settle: [], waitForGpu: false };
 
 let oldestPendingInput: number | null = null;
 
@@ -32,7 +42,9 @@ const push = (series: number[], value: number): void => {
 };
 
 export const resetGestureTimings = (): void => {
-  for (const series of Object.values(gestureTimings)) series.length = 0;
+  for (const series of [gestureTimings.inputToFrame, gestureTimings.update, gestureTimings.render, gestureTimings.release, gestureTimings.settle]) {
+    series.length = 0;
+  }
   oldestPendingInput = null;
 };
 
@@ -40,6 +52,16 @@ export const resetGestureTimings = (): void => {
 export const noteInput = (timeStamp: number, updateMs: number): void => {
   oldestPendingInput ??= timeStamp;
   push(gestureTimings.update, updateMs);
+};
+
+/** Un relâchement a pris `ms` millisecondes. */
+export const noteRelease = (ms: number): void => {
+  push(gestureTimings.release, ms);
+};
+
+/** Le raster d'un trait est entré dans le document `ms` millisecondes après le relâchement. */
+export const noteSettle = (ms: number): void => {
+  push(gestureTimings.settle, ms);
 };
 
 /** Une image vient d'être dessinée, à l'instant `now` (`performance.now()`). */

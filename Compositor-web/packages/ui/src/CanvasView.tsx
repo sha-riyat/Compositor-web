@@ -21,7 +21,7 @@ import {
   watchDevicePixelRatio,
 } from '@compositor/renderer';
 import { getBlendPreview, subscribeBlendPreview } from './blendPreview.js';
-import { noteFrame, noteInput } from './latency.js';
+import { gestureTimings, noteFrame, noteInput, noteRelease } from './latency.js';
 
 /**
  * Le canevas. **Il n'est jamais rendu par React** : React monte l'élément une
@@ -72,6 +72,9 @@ export const CanvasView = ({ tool, onCompositorReady, onMessage }: CanvasViewPro
         { activeLayerId, showsTransformBox: ui.showsTransformBox && ui.tool === 'move' },
         getBlendPreview(),
       );
+      // Pour un banc honnête : attendre que le GPU ait fini l'image, et non
+      // seulement qu'il ait reçu les commandes. Lire un pixel force cette attente.
+      if (gestureTimings.waitForGpu) context.gl.readPixels(0, 0, 1, 1, context.gl.RGBA, context.gl.UNSIGNED_BYTE, syncPixel);
       const end = performance.now();
       noteFrame(end, end - start);
     };
@@ -126,13 +129,7 @@ export const CanvasView = ({ tool, onCompositorReady, onMessage }: CanvasViewPro
       },
       requestRedraw,
       toDocument,
-      beginStroke: (layerId, asset, width, height) => compositor.strokes.begin(layerId, asset, width, height),
-      updateStroke: (tiles) => compositor.strokes.update(tiles),
-      commitStroke: (asset) => compositor.strokes.commit(asset),
-      cancelStroke: () => {
-        compositor.strokes.cancel();
-        requestRedraw();
-      },
+      beginStroke: (layerId, asset, target, settings) => compositor.brush.start(layerId, asset, target, settings),
       notify: (message) => messageRef.current?.(message),
     };
 
@@ -191,7 +188,9 @@ export const CanvasView = ({ tool, onCompositorReady, onMessage }: CanvasViewPro
       if (canvas.hasPointerCapture(event.pointerId)) {
         canvas.releasePointerCapture(event.pointerId);
       }
+      const start = performance.now();
       toolRef.current.onPointerUp(toolEvent(event), api);
+      noteRelease(performance.now() - start);
       requestRedraw();
       updateCursor(event);
     };
@@ -283,6 +282,8 @@ export const CanvasView = ({ tool, onCompositorReady, onMessage }: CanvasViewPro
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
+
+const syncPixel = new Uint8Array(4);
 
 const supportsRawUpdate =
   typeof window !== 'undefined' && 'onpointerrawupdate' in window;

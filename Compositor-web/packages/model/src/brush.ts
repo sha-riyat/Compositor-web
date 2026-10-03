@@ -1,8 +1,8 @@
-import { applyAffine, invertAffine, pixelToDocument, type Affine, type Point, type Size, type Transform } from './geometry.js';
-import { readTile, replaceTiles, tileGrid, tileKey, tileRect, TILE_SIZE, type PixelSource, type TileGrid, type TiledRaster } from './raster.js';
+import type { Affine, Point, Size } from './geometry.js';
+import { readTile, replaceTiles, tileRect, type PixelSource, type TiledRaster } from './raster.js';
+import { StrokePath, union, type PathUpdate, type PixelRect, type StrokeTarget } from './strokePath.js';
 import {
   createTip,
-  curvePiece,
   DENSITY_CAP,
   prepareSegment,
   type PreparedSegment,
@@ -41,34 +41,17 @@ export interface BrushSettings {
 /** Les valeurs par défaut de `BrushSettings` dans l'original : 40 px, dure, noire, opaque. */
 export const DEFAULT_BRUSH: BrushSettings = { diameter: 40, hardness: 1, red: 0, green: 0, blue: 0, opacity: 1 };
 
-export interface StrokeTarget {
-  readonly width: number;
-  readonly height: number;
-  /** Les pixels actuels du calque ; `null` pour un calque vide. */
-  readonly source: PixelSource | null;
-  /** Le placement du calque : la pointe est ronde dans le document, pas dans ses pixels. */
-  readonly transform: Transform;
-  /** La peinture s'arrête aux bords du canevas, comme dans l'original. */
-  readonly canvas: Size;
-}
-
-interface PixelRect {
-  readonly x0: number;
-  readonly y0: number;
-  readonly x1: number;
-  readonly y1: number;
-}
+export type { StrokeTarget } from './strokePath.js';
 
 export class BrushStroke {
   readonly width: number;
   readonly height: number;
   readonly #source: PixelSource | null;
-  readonly #grid: TileGrid;
+  readonly #path: StrokePath;
   readonly #settings: BrushSettings;
   readonly #tip: Tip;
   readonly #soft: boolean;
   readonly #toDocument: Affine;
-  readonly #toPixels: Affine;
   readonly #canvas: Size;
   /** Densité (pointe douce) ou couverture (pointe dure) déjà peinte, par tuile. */
   readonly #permanent = new Map<number, Float32Array>();
@@ -79,21 +62,17 @@ export class BrushStroke {
   readonly #dirty = new Map<number, PixelRect>();
   /** Par niveau de couverture : la couleur déposée et la part de source gardée. */
   readonly #blend: { readonly add: Float64Array; readonly keep: Float64Array };
-  #samples: Point[] = [];
   #tail: PreparedSegment[] = [];
-  #tailRects: (PixelRect | null)[] = [];
 
   constructor(target: StrokeTarget, settings: BrushSettings) {
     this.width = target.width;
     this.height = target.height;
     this.#source = target.source;
-    this.#grid = tileGrid(target.width, target.height);
     this.#settings = settings;
-    this.#toDocument = pixelToDocument(target.transform, target.width, target.height);
-    this.#toPixels = invertAffine(this.#toDocument);
+    this.#path = new StrokePath(target, settings.diameter / 2);
+    this.#toDocument = this.#path.toDocument;
     this.#canvas = target.canvas;
-    const m = this.#toDocument;
-    this.#tip = createTip(settings.diameter, settings.hardness, Math.min(Math.hypot(m.a, m.b), Math.hypot(m.c, m.d)));
+    this.#tip = createTip(settings.diameter, settings.hardness, this.#path.pixelSize);
     this.#soft = settings.hardness < 1;
     const add = new Float64Array(256 * 4);
     const keep = new Float64Array(256);
@@ -116,27 +95,14 @@ export class BrushStroke {
 
   /** Ajoute un échantillon du pointeur, en pixels du **document**. */
   append(point: Point): void {
-    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
-    if (Math.abs(point.x) > 10_000_000 || Math.abs(point.y) > 10_000_000) return;
-    const last = this.#samples.at(-1);
-    if (last !== undefined && last.x === point.x && last.y === point.y) return;
-    this.#samples.push(point);
-    if (this.#samples.length > 4) this.#samples.shift();
-    const s = this.#samples;
-    const n = s.length;
-    const settled: Segment[] =
-      n === 1 ? [[point.x, point.y, point.x, point.y]] : n >= 3 ? curvePiece(s[n - 3]!, s[n - 2]!, s[Math.max(0, n - 4)]!, point) : [];
-    const tail: Segment[] = n >= 2 ? [[s[n - 2]!.x, s[n - 2]!.y, point.x, point.y]] : [];
-    this.#render(settled, tail);
+    const update = this.#path.append(point);
+    if (update !== null) this.#render(update);
   }
 
   /** Remplace la fin provisoire par le dernier morceau de courbe. Sans effet si on le répète. */
   flush(): void {
-    const s = this.#samples;
-    const n = s.length;
-    if (n < 2) return;
-    this.#render(curvePiece(s[n - 2]!, s[n - 1]!, s[Math.max(0, n - 3)]!, s[n - 1]!), []);
-    this.#samples = [s[n - 1]!];
+    const update = this.#path.flush();
+    if (update !== null) this.#render(update);
   }
 
   /** Les tuiles recomposées depuis le dernier appel, pour l'aperçu. */
@@ -155,64 +121,16 @@ export class BrushStroke {
     return replaceTiles(this.#source, this.width, this.height, this.#composed);
   }
 
-  #render(settled: readonly Segment[], tail: readonly Segment[]): void {
-    const tailRects = tail.map((segment) => this.#reach(segment));
-    for (const rect of [...settled.map((segment) => this.#reach(segment)), ...tailRects, ...this.#tailRects]) {
-      if (rect !== null) this.#touch(rect);
-    }
-    for (const segment of settled) this.#deposit(segment);
-    this.#tail = tail.map(prepareSegment);
-    this.#tailRects = tailRects;
-  }
-
-  /** Alloue les tuiles qu'un rectangle touche, et y marque la zone à recomposer. */
-  #touch(r: PixelRect): void {
-    for (let row = Math.floor(r.y0 / TILE_SIZE); row <= Math.floor((r.y1 - 1) / TILE_SIZE); row++) {
-      for (let column = Math.floor(r.x0 / TILE_SIZE); column <= Math.floor((r.x1 - 1) / TILE_SIZE); column++) {
-        const key = tileKey(this.#grid, column, row);
+  #render(update: PathUpdate): void {
+    for (const [key, zone] of this.#path.zones(update)) {
+      if (!this.#permanent.has(key)) {
         const rect = tileRect(this.width, this.height, key);
-        if (!this.#permanent.has(key)) this.#permanent.set(key, new Float32Array(rect.width * rect.height));
-        const local = {
-          x0: Math.max(0, r.x0 - rect.x),
-          y0: Math.max(0, r.y0 - rect.y),
-          x1: Math.min(rect.width, r.x1 - rect.x),
-          y1: Math.min(rect.height, r.y1 - rect.y),
-        };
-        const previous = this.#dirty.get(key);
-        this.#dirty.set(
-          key,
-          previous === undefined
-            ? local
-            : {
-                x0: Math.min(previous.x0, local.x0),
-                y0: Math.min(previous.y0, local.y0),
-                x1: Math.max(previous.x1, local.x1),
-                y1: Math.max(previous.y1, local.y1),
-              },
-        );
+        this.#permanent.set(key, new Float32Array(rect.width * rect.height));
       }
+      this.#dirty.set(key, union(this.#dirty.get(key), zone));
     }
-  }
-
-  /** Les pixels du calque qu'un segment peut atteindre, bornés au canevas et au calque. */
-  #reach(s: Segment): PixelRect | null {
-    const reach = this.#tip.radius + 2;
-    const left = Math.max(0, Math.min(s[0], s[2]) - reach);
-    const top = Math.max(0, Math.min(s[1], s[3]) - reach);
-    const right = Math.min(this.#canvas.width, Math.max(s[0], s[2]) + reach);
-    const bottom = Math.min(this.#canvas.height, Math.max(s[1], s[3]) + reach);
-    if (left >= right || top >= bottom) return null;
-    const corners = [
-      applyAffine(this.#toPixels, { x: left, y: top }),
-      applyAffine(this.#toPixels, { x: right, y: top }),
-      applyAffine(this.#toPixels, { x: left, y: bottom }),
-      applyAffine(this.#toPixels, { x: right, y: bottom }),
-    ];
-    const x0 = Math.max(0, Math.floor(Math.min(...corners.map((p) => p.x))));
-    const y0 = Math.max(0, Math.floor(Math.min(...corners.map((p) => p.y))));
-    const x1 = Math.min(this.width, Math.ceil(Math.max(...corners.map((p) => p.x))));
-    const y1 = Math.min(this.height, Math.ceil(Math.max(...corners.map((p) => p.y))));
-    return x0 < x1 && y0 < y1 ? { x0, y0, x1, y1 } : null;
+    for (const segment of update.settled) this.#deposit(segment);
+    this.#tail = this.#path.tail.map(prepareSegment);
   }
 
   /**
@@ -221,7 +139,7 @@ export class BrushStroke {
    * pixels, et rien n'est alloué par pixel — c'est elle qui tient la latence.
    */
   #deposit(segment: Segment): void {
-    const r = this.#reach(segment);
+    const r = this.#path.reach(segment);
     if (r === null) return;
     const s = prepareSegment(segment);
     const { a, b, c, d, tx, ty } = this.#toDocument;
@@ -231,41 +149,37 @@ export class BrushStroke {
     const { radius, antialias, spacing } = tip;
     const length = s.length;
     const soft = this.#soft;
-    for (let row = Math.floor(r.y0 / TILE_SIZE); row <= Math.floor((r.y1 - 1) / TILE_SIZE); row++) {
-      for (let column = Math.floor(r.x0 / TILE_SIZE); column <= Math.floor((r.x1 - 1) / TILE_SIZE); column++) {
-        const key = tileKey(this.#grid, column, row);
-        const rect = tileRect(this.width, this.height, key);
-        const permanent = this.#permanent.get(key)!;
-        const xs = Math.max(r.x0, rect.x);
-        const xe = Math.min(r.x1, rect.x + rect.width);
-        const ye = Math.min(r.y1, rect.y + rect.height);
-        for (let y = Math.max(r.y0, rect.y); y < ye; y++) {
-          let px = a * (xs + 0.5) + c * (y + 0.5) + tx;
-          let py = b * (xs + 0.5) + d * (y + 0.5) + ty;
-          let i = (y - rect.y) * rect.width + (xs - rect.x);
-          for (let x = xs; x < xe; x++, i++, px += a, py += b) {
-            if (px < 0 || py < 0 || px >= cw || py >= ch) continue;
-            const ox = px - s.ax;
-            const oy = py - s.ay;
-            if (soft) {
-              let density: number;
-              if (length === 0) density = tip.density(ox * ox + oy * oy);
-              else {
-                const projection = ox * s.ux + oy * s.uy;
-                const cross = ox * s.uy - oy * s.ux;
-                const h = cross < 0 ? -cross : cross;
-                if (h >= radius) continue;
-                density = tip.sweep(h, -projection, length - projection);
-              }
-              const value = permanent[i]! + density;
-              permanent[i] = value > DENSITY_CAP ? DENSITY_CAP : value;
-            } else {
-              const t = length === 0 ? 0 : Math.min(length, Math.max(0, ox * s.ux + oy * s.uy));
-              const ex = ox - t * s.ux;
-              const ey = oy - t * s.uy;
-              const value = (radius - Math.sqrt(ex * ex + ey * ey)) / antialias + 0.5;
-              if (value > permanent[i]!) permanent[i] = value > 1 ? 1 : value;
+    for (const { key, rect } of this.#path.tilesOf(r)) {
+      const permanent = this.#permanent.get(key)!;
+      const xs = Math.max(r.x0, rect.x);
+      const xe = Math.min(r.x1, rect.x + rect.width);
+      const ye = Math.min(r.y1, rect.y + rect.height);
+      for (let y = Math.max(r.y0, rect.y); y < ye; y++) {
+        let px = a * (xs + 0.5) + c * (y + 0.5) + tx;
+        let py = b * (xs + 0.5) + d * (y + 0.5) + ty;
+        let i = (y - rect.y) * rect.width + (xs - rect.x);
+        for (let x = xs; x < xe; x++, i++, px += a, py += b) {
+          if (px < 0 || py < 0 || px >= cw || py >= ch) continue;
+          const ox = px - s.ax;
+          const oy = py - s.ay;
+          if (soft) {
+            let density: number;
+            if (length === 0) density = tip.density(ox * ox + oy * oy);
+            else {
+              const projection = ox * s.ux + oy * s.uy;
+              const cross = ox * s.uy - oy * s.ux;
+              const h = cross < 0 ? -cross : cross;
+              if (h >= radius) continue;
+              density = tip.sweep(h, -projection, length - projection);
             }
+            const value = permanent[i]! + density;
+            permanent[i] = value > DENSITY_CAP ? DENSITY_CAP : value;
+          } else {
+            const t = length === 0 ? 0 : Math.min(length, Math.max(0, ox * s.ux + oy * s.uy));
+            const ex = ox - t * s.ux;
+            const ey = oy - t * s.uy;
+            const value = (radius - Math.sqrt(ex * ex + ey * ey)) / antialias + 0.5;
+            if (value > permanent[i]!) permanent[i] = value > 1 ? 1 : value;
           }
         }
       }
@@ -294,7 +208,7 @@ export class BrushStroke {
     const { radius, antialias, spacing } = tip;
     const soft = this.#soft;
     const tail = this.#tail[0];
-    const tailRect = this.#tailRects[0] ?? null;
+    const tailRect = this.#path.tailRects[0] ?? null;
     const { a, b, c, d, tx, ty } = this.#toDocument;
     const cw = this.#canvas.width;
     const ch = this.#canvas.height;

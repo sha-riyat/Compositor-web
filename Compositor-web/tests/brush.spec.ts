@@ -19,6 +19,7 @@ type Globals = {
     };
     uiStore: { getState(): { tool: string; brush: unknown }; setState(state: unknown): void };
     historyDetails(): { undoCount: number; undoName: string };
+    isEditing(): boolean;
   };
 };
 
@@ -51,6 +52,13 @@ const at = async (page: Page, x: number, y: number) => {
   return { x: box.x + 10 + x, y: box.y + 10 + y };
 };
 
+/**
+ * Le raster d'un trait peint par le GPU entre dans le document quelques images
+ * après le relâchement : attendre que la transaction du trait soit fermée.
+ */
+const settled = (page: Page) =>
+  page.waitForFunction(() => !(window as never as Globals).__compositor.isEditing());
+
 /** Un trait à la souris, d'un point à l'autre du document. */
 const stroke = async (page: Page, points: readonly (readonly [number, number])[], during?: () => Promise<void>) => {
   const first = await at(page, points[0]![0], points[0]![1]);
@@ -62,6 +70,7 @@ const stroke = async (page: Page, points: readonly (readonly [number, number])[]
   }
   await during?.();
   await page.mouse.up();
+  await settled(page);
 };
 
 /** Ce que le GPU compose, comparé octet par octet aux pixels du calque côté CPU. */
@@ -116,6 +125,7 @@ test('un trait traverse les tuiles sans couture, et s’annule d’un coup', asy
   for (const pixel of await composed(page, xs, 40)) expect(pixel).toEqual([255, 0, 0, 255]);
 
   await page.mouse.up();
+  await settled(page);
   expect(await undoCount(page)).toBe(before + 1);
   expect(await page.evaluate(() => (window as never as Globals).__compositor.historyDetails().undoName)).toBe('Coup de brosse');
   for (const pixel of await composed(page, xs, 40)) expect(pixel).toEqual([255, 0, 0, 255]);
@@ -198,6 +208,35 @@ test('Ctrl+Z pendant un trait ne fait rien : le geste se termine en une entrée'
   expect(await undoCount(page)).toBe(before + 1);
   const [top, bottom] = [(await composed(page, [200], 20))[0]!, (await composed(page, [200], 150))[0]!];
   expect([top[3], bottom[3]]).toEqual([255, 255]);
+});
+
+test('deux traits enchaînés sans attendre : le second ne perd pas le premier', async ({ page }) => {
+  // Tout le document reste dans le canevas visible : un appui hors de lui irait au panneau des calques.
+  await open(page, 800, 500);
+  // Un premier trait large : sa relecture prend plusieurs images.
+  await page.evaluate(() => {
+    (window as never as Globals).__compositor.uiStore.setState({
+      brush: { diameter: 300, hardness: 0, red: 0, green: 0, blue: 0, opacity: 1 },
+    });
+  });
+  await page.keyboard.press('b');
+  const before = await undoCount(page);
+  const a = await at(page, 100, 200);
+  const b = await at(page, 700, 200);
+  const c = await at(page, 700, 480);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 6 });
+  // Relâché puis repris au même endroit, sans attendre : la relecture du premier n'est pas finie.
+  await page.mouse.up();
+  await page.mouse.down();
+  await page.mouse.move(c.x, c.y, { steps: 4 });
+  await page.mouse.up();
+  await settled(page);
+  expect(await undoCount(page)).toBe(before + 2);
+  expect((await composed(page, [200], 200))[0]![3]).toBe(255);
+  expect((await composed(page, [700], 460))[0]![3]).toBe(255);
+  expect(await gpuAgainstCpu(page)).toMatchObject({ count: 0 });
 });
 
 test('un calque masqué refuse la brosse, et dit pourquoi', async ({ page }) => {

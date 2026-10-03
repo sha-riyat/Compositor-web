@@ -2,6 +2,9 @@ import type { CompositorDocument } from './document.js';
 import type { Point } from './geometry.js';
 import type { AssetId, LayerId } from './layer.js';
 import type { AssetStore } from './assets.js';
+import type { BrushSettings } from './brush.js';
+import type { TiledRaster } from './raster.js';
+import type { StrokeTarget } from './strokePath.js';
 import type { ToolId } from './store.js';
 
 /**
@@ -38,18 +41,42 @@ export interface ToolApi {
   toDocument(client: Point): Point;
 
   /**
-   * L'aperçu d'un trait (T4) : le document ne change qu'au relâchement. D'ici
-   * là, le calque est dessiné depuis une texture où seules les tuiles
-   * touchées sont téléversées.
+   * Commence un trait de peinture (T4) sur le calque `layerId`. Le document ne
+   * change qu'au relâchement ; d'ici là, le trait dessine son propre aperçu.
+   * Le moteur — GPU, ou processeur à défaut — est choisi par le rendu.
    */
-  beginStroke(layerId: LayerId, asset: AssetId | null, width: number, height: number): void;
-  updateStroke(tiles: ReadonlyMap<number, Uint8ClampedArray>): void;
-  /** À appeler une fois `asset` posé sur le calque : l'aperçu devient sa texture. */
-  commitStroke(asset: AssetId): void;
-  cancelStroke(): void;
+  beginStroke(layerId: LayerId, asset: AssetId | null, target: StrokeTarget, settings: BrushSettings): PaintStroke;
 
   /** Un message pour la barre d'état — pourquoi la brosse refuse, par exemple. */
   notify(message: string): void;
+}
+
+/** Un trait en cours, quel que soit le moteur qui le peint. */
+export interface PaintStroke {
+  /** Un échantillon du pointeur, en pixels du document. */
+  append(point: Point): void;
+  /** Fin d'un lot d'échantillons : l'aperçu se met à jour. */
+  present(): void;
+  /**
+   * Le relâchement : la fin provisoire devient courbe et l'aperçu se met à
+   * jour. Le raster produit arrive ensuite, par la passation rendue : sur le
+   * GPU, ses tuiles sont relues en plusieurs fois, sans bloquer une image.
+   */
+  finish(): RasterHandoff;
+  /** Le raster est posé sous `asset` : l'aperçu devient sa texture. */
+  adopt(asset: AssetId): void;
+  cancel(): void;
+}
+
+/** La remise du raster d'un trait, une fois relu. */
+export interface RasterHandoff {
+  /**
+   * Avance la relecture d'au plus `budgetMs` millisecondes. Rend le raster —
+   * ou `null` si le trait n'a rien peint — une fois prêt, `undefined` sinon.
+   */
+  step(budgetMs: number): TiledRaster | null | undefined;
+  /** Termine la relecture tout de suite, quoi qu'il en coûte. */
+  complete(): TiledRaster | null;
 }
 
 export interface ToolEvent {

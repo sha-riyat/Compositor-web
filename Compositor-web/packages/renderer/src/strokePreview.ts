@@ -30,6 +30,16 @@ export class StrokePreview {
     this.#textures = textures;
   }
 
+  /** La texture d'aperçu du trait en cours, que le moteur GPU peint directement. */
+  get target(): PreviewTexture | null {
+    return this.#entry;
+  }
+
+  /** Le moteur GPU a écrit dans la texture : ses niveaux réduits sont à refaire. */
+  markStale(): void {
+    this.#mipmapsStale = true;
+  }
+
   /** La texture qui remplace celle du calque `layerId`, s'il est en train d'être peint. */
   textureFor(layerId: LayerId): PreviewTexture | null {
     if (layerId !== this.#layerId || this.#entry === null) return null;

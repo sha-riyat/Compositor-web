@@ -134,10 +134,9 @@ describe('pixels entiers', () => {
       selectLayer: () => undefined,
       requestRedraw: () => undefined,
       toDocument: (p) => p,
-      beginStroke: () => undefined,
-      updateStroke: () => undefined,
-      commitStroke: () => undefined,
-      cancelStroke: () => undefined,
+      beginStroke: () => {
+        throw new Error('Déplacer ne peint pas');
+      },
       notify: () => undefined,
     };
     const tool = createMoveTool({
