@@ -30,8 +30,13 @@ export type Sampling = 'nearest' | 'linear' | 'high';
 export interface Transform {
   readonly origin: Point;
   readonly size: Size;
-  /** Rotation horaire, en radians. */
-  readonly radians: number;
+  /**
+   * Rotation horaire, en **degrés** — comme `LayerTransform.rotation` dans
+   * l'original, et comme dans le fichier. Stocker des radians faisait dériver
+   * 22 % des angles au dixième de degré à chaque aller-retour : seuls le dessin
+   * et la géométrie les calculent, par `transformRadians`.
+   */
+  readonly rotation: number;
   readonly flipX: boolean;
   readonly flipY: boolean;
   readonly sampling: Sampling;
@@ -45,7 +50,7 @@ export interface Transform {
 export const identityTransform = (size: Size, origin: Point = { x: 0, y: 0 }): Transform => ({
   origin,
   size,
-  radians: 0,
+  rotation: 0,
   flipX: false,
   flipY: false,
   sampling: 'high',
@@ -61,7 +66,7 @@ export const roundTransform = (t: Transform): Transform => ({
   ...t,
   origin: { x: rounded(t.origin.x), y: rounded(t.origin.y) },
   size: { width: Math.max(1, rounded(t.size.width)), height: Math.max(1, rounded(t.size.height)) },
-  radians: (rounded((t.radians * 180) / Math.PI) * Math.PI) / 180,
+  rotation: rounded(t.rotation),
 });
 
 /**
@@ -72,6 +77,13 @@ export const rounded = (value: number): number => {
   const result = Math.sign(value) * Math.round(Math.abs(value));
   return result === 0 ? 0 : result;
 };
+
+/**
+ * L'angle en radians, pour dessiner — `LayerTransform.radians` :
+ * `rotation.truncatingRemainder(dividingBy: 360) * .pi / 180`. Le `%` de
+ * JavaScript a le même signe que le dividende, comme `truncatingRemainder`.
+ */
+export const transformRadians = (t: Transform): number => ((t.rotation % 360) * Math.PI) / 180;
 
 export const transformCenter = (t: Transform): Point => ({
   x: t.origin.x + t.size.width / 2,
@@ -96,8 +108,8 @@ export const transformContains = (t: Transform, p: Point): boolean => {
   const c = transformCenter(t);
   const dx = p.x - c.x;
   const dy = p.y - c.y;
-  const cos = Math.cos(-t.radians);
-  const sin = Math.sin(-t.radians);
+  const cos = Math.cos(-transformRadians(t));
+  const sin = Math.sin(-transformRadians(t));
   const lx = dx * cos - dy * sin;
   const ly = dx * sin + dy * cos;
   return (

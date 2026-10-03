@@ -16,7 +16,7 @@ const sample = (): CompositorDocument => {
   let doc = createDocument('document-de-test', 800, 600, 144);
   doc = addLayer(doc, createLayer(UUID_A, 'Photo', {
     ...identityTransform({ width: 400, height: 300 }, { x: 10.5, y: -20 }),
-    radians: Math.PI / 2,
+    rotation: 90,
     flipX: true,
     sampling: 'linear',
   }, 'asset-1'));
@@ -161,4 +161,11 @@ describe('les manifestes refusés', () => {
     expect(kind(withLayer(0, { isGroup: true }))).toBe('invalid');
     expect(kind(withLayer(1, { parentID: layerOf(valid(), 0).id }))).toBe('invalid');
   });
+});
+
+/** `ProjectTests.theCurrentFormatVersionIsOneTheReaderAccepts`. */
+test('la version écrite est une version que la lecture accepte', async () => {
+  const { CURRENT_VERSION, SUPPORTED_VERSIONS } = await import('./manifest.js');
+  expect(CURRENT_VERSION).toBeGreaterThanOrEqual(SUPPORTED_VERSIONS.min);
+  expect(CURRENT_VERSION).toBeLessThanOrEqual(SUPPORTED_VERSIONS.max);
 });

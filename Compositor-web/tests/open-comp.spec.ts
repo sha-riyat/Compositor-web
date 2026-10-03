@@ -41,7 +41,7 @@ const saved = async (page: Page): Promise<string> => {
         id: 'd', width: 320, height: 200, resolution: 72,
         layers: [{
           id: uuid, name: 'Enregistré', asset, isVisible: true, parentId: null, isGroup: false, opacity: 0.4, blendMode: 'screen',
-          transform: { origin: { x: 5, y: 6 }, size: { width: 8, height: 8 }, radians: 0, flipX: false, flipY: false, sampling: 'high' },
+          transform: { origin: { x: 5, y: 6 }, size: { width: 8, height: 8 }, rotation: 0, flipX: false, flipY: false, sampling: 'high' },
         }],
       },
       activeLayerId: uuid,

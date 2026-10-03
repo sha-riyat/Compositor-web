@@ -94,7 +94,7 @@ describe('ce que l’on lit', () => {
       id: ID, name: 'solutions icon', isVisible: true, isGroup: false, opacity: 1, blendMode: 'normal', parentId: null,
     });
     expect(first!.transform).toEqual({
-      origin: { x: 103, y: 0 }, size: { width: 789, height: 709 }, radians: 0, flipX: false, flipY: false, sampling: 'linear',
+      origin: { x: 103, y: 0 }, size: { width: 789, height: 709 }, rotation: 0, flipX: false, flipY: false, sampling: 'linear',
     });
     expect(opened.images.get(ID)?.width).toBe(4);
   });
@@ -109,7 +109,7 @@ describe('ce que l’on lit', () => {
     expect(opened.activeLayerId).toBe(ID);
     expect(first!.blendMode).toBe('linearDodge');
     expect(first!.opacity).toBe(0.25);
-    expect(first!.transform.radians).toBeCloseTo(Math.PI / 2, 12);
+    expect(first!.transform.rotation).toBe(90);
     expect(first!.transform.sampling).toBe('high');
   });
 
@@ -162,5 +162,33 @@ describe('ce qui est refusé', () => {
     expect(error.message).toMatch(/masques/);
     const guides = await failure(() => open(project(manifest({ guides: [{ id: DOC, position: 10 }] }))));
     expect(guides.message).toMatch(/repères/);
+  });
+});
+
+/**
+ * La rotation en degrés, comme l'original. Avec des radians en mémoire,
+ * 22 % des angles au dixième de degré revenaient avec un écart jusqu'à
+ * 1,1·10⁻¹³ — `33.300000000000004` au lieu de `33.3`.
+ */
+describe('la rotation traverse la lecture et l’écriture à l’identique', () => {
+  test('les 14 401 angles au dixième entre -720° et 720°', async () => {
+    const { buildManifest } = await import('./write.js');
+    const degrees = Array.from({ length: 14_401 }, (_, i) => (i - 7_200) / 10);
+    const different: number[] = [];
+    // Par projets de 5 000 calques : l'original en refuse plus de 10 000.
+    for (let start = 0; start < degrees.length; start += 5_000) {
+      const chunk = degrees.slice(start, start + 5_000);
+      const layers = chunk.map((rotation, i) => layer({
+        id: `00000000-0000-4000-8000-${(start + i).toString(16).padStart(12, '0')}`,
+        imageFile: undefined,
+        transform: { ...layer().transform, rotation },
+      }));
+      const opened = await open(project(manifest({}, layers), {}));
+      const written = buildManifest(opened.document, null).layers.map((l) => l.transform.rotation);
+      written.forEach((value, i) => {
+        if (value !== chunk[i]) different.push(chunk[i]!);
+      });
+    }
+    expect(different).toEqual([]);
   });
 });

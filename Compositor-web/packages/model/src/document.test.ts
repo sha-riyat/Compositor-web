@@ -100,7 +100,7 @@ describe('désignation du calque sous le pointeur', () => {
   test('la rotation est prise en compte : un coin sort de la boîte tournée', () => {
     const transform = {
       ...identityTransform({ width: 10, height: 10 }, { x: 0, y: 0 }),
-      radians: Math.PI / 4,
+      rotation: 45,
     };
     // Le coin supérieur gauche du rectangle droit tombe hors du losange tourné.
     expect(transformContains(transform, { x: 0.2, y: 0.2 })).toBe(false);

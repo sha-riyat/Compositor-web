@@ -13,6 +13,7 @@ import {
   insertBlankLayer,
   layerRange,
   moveLayer,
+  newId,
   nextBlankLayerName,
   removeLayers,
   renameLayer,
@@ -147,7 +148,7 @@ export const LayerList = (): React.ReactElement => {
 
   /** Numéroté comme dans l'original, et aussitôt actif — `addBlankLayer`. */
   const addBlank = (): void => {
-    const id = crypto.randomUUID();
+    const id = newId();
     // Le calque et sa sélection dans la même entrée : annuler rend aussi la
     // sélection d'avant.
     edit('Nouveau calque vide', () => {
@@ -180,7 +181,7 @@ export const LayerList = (): React.ReactElement => {
     const { document: next, created } = duplicateLayers(
       current.document,
       current.selectedLayerIds,
-      () => crypto.randomUUID(),
+      newId,
     );
     if (created.length === 0) return;
     edit('Dupliquer le calque', () => {

@@ -39,7 +39,7 @@ const setUp = async (page: Page): Promise<void> => {
       asset: documentStore.getState().assets.add({
         width: 100, height: 100, data: new Uint8ClampedArray(100 * 100 * 4).fill(180), isOpaque: true,
       }),
-      transform: { origin: { x, y: 0 }, size: { width: 100, height: 100 }, radians: 0, flipX: false, flipY: false, sampling: 'linear' },
+      transform: { origin: { x, y: 0 }, size: { width: 100, height: 100 }, rotation: 0, flipX: false, flipY: false, sampling: 'linear' },
     });
     documentStore.setState({
       document: { id: 'g', width: 400, height: 200, resolution: 72, layers: [layer('A', 0), layer('B', 150), layer('C', 300)] },

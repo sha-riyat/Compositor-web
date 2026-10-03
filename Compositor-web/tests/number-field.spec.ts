@@ -44,7 +44,7 @@ const reset = (): Promise<void> =>
         layers: [{
           id: 'c', name: 'c', asset, isVisible: true, parentId: null, isGroup: false,
           opacity: 1, blendMode: 'normal',
-          transform: { origin: { x: 100, y: 50 }, size: { width: 64, height: 64 }, radians: 0, flipX: false, flipY: false, sampling: 'linear' },
+          transform: { origin: { x: 100, y: 50 }, size: { width: 64, height: 64 }, rotation: 0, flipX: false, flipY: false, sampling: 'linear' },
         }],
       },
       activeLayerId: 'c',

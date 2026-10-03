@@ -175,7 +175,7 @@ export const readProject = async (files: PackageFiles, decode: DecodePNG, maxSid
       transform: {
         origin: { x, y },
         size: { width, height },
-        radians: (record.transform.rotation * Math.PI) / 180,
+        rotation: record.transform.rotation,
         flipX: record.transform.flipX,
         flipY: record.transform.flipY,
         sampling: samplingOf(record.transform.sampling),

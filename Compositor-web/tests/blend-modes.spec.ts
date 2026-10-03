@@ -116,7 +116,7 @@ const compositePixel = async (
         transform: {
           origin: { x: 0, y: 0 },
           size: { width: 4, height: 4 },
-          radians: 0,
+          rotation: 0,
           flipX: false,
           flipY: false,
           sampling: 'nearest',

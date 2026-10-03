@@ -18,7 +18,7 @@ describe('inversion de matrice', () => {
     const m = mat3ForTransform({
       origin: { x: 37, y: -12 },
       size: { width: 120, height: 45 },
-      radians: 0.7,
+      rotation: 40,
       flipX: true,
       flipY: false,
       sampling: 'linear',

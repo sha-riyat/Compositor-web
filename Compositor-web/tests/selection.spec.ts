@@ -75,7 +75,7 @@ test('un clic en Sélection auto rend le calque touché seul sélectionné', asy
       });
     const layer = (id: string, x: number) => ({
       id, name: id, asset: solid(), isVisible: true, parentId: null, isGroup: false, opacity: 1, blendMode: 'normal',
-      transform: { origin: { x, y: 0 }, size: { width: 100, height: 100 }, radians: 0, flipX: false, flipY: false, sampling: 'linear' },
+      transform: { origin: { x, y: 0 }, size: { width: 100, height: 100 }, rotation: 0, flipX: false, flipY: false, sampling: 'linear' },
     });
     documentStore.setState({
       document: { id: 's', width: 300, height: 100, resolution: 72, layers: [layer('gauche', 0), layer('droite', 200)] },
