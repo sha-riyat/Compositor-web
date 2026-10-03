@@ -1,26 +1,23 @@
 import type { CompositorDocument } from '@compositor/model';
 import { unpremultiply } from './alpha.js';
+import { crc32, encodePNGBytes } from './png.js';
 
 /**
  * Export PNG. Le critère de sortie du pari passe par ici : un PNG importé puis
  * exporté sans rien toucher doit revenir identique.
  */
 
-/** Encode des pixels composés en PNG. */
+/**
+ * Encode des pixels composés — **prémultipliés** — en PNG. Sans canevas :
+ * voir `png.ts`, et pourquoi `convertToBlob` n'est plus utilisé.
+ */
 export const encodePNG = async (
   pixels: Uint8ClampedArray<ArrayBuffer>,
   width: number,
   height: number,
 ): Promise<Blob> => {
-  const canvas = new OffscreenCanvas(width, height);
-  const context = canvas.getContext('2d', { colorSpace: 'srgb' });
-  if (context === null) throw new Error("Contexte 2D indisponible pour l'export.");
-
-  const straight = unpremultiply(pixels);
-  const imageData = new ImageData(straight, width, height, { colorSpace: 'srgb' });
-  context.putImageData(imageData, 0, 0);
-
-  return canvas.convertToBlob({ type: 'image/png' });
+  const bytes = encodePNGBytes(unpremultiply(pixels), width, height);
+  return new Blob([new Uint8Array(bytes)], { type: 'image/png' });
 };
 
 /**
@@ -59,20 +56,4 @@ export const exportDocumentPNG = async (
 ): Promise<Blob> => {
   const png = await encodePNG(pixels, document.width, document.height);
   return withResolution(png, document.resolution);
-};
-
-const CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    table[n] = c >>> 0;
-  }
-  return table;
-})();
-
-const crc32 = (bytes: Uint8Array): number => {
-  let c = 0xffffffff;
-  for (const byte of bytes) c = CRC_TABLE[(c ^ byte) & 0xff]! ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
 };
