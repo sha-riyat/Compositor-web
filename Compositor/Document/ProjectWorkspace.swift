@@ -44,11 +44,21 @@ final class ProjectWorkspace {
         tabs.append(tab); selectedID = tab.id
         return tab
     }
+    /// Reorders a tab by dragging it in the strip. Chrome, not a document edit, so it never touches undo.
+    /// `index` is where the tab should land in the final order, clamped to the array's bounds.
+    func moveTab(_ id: UUID, to index: Int) {
+        guard let from = tabs.firstIndex(where: { $0.id == id }) else { return }
+        let target = min(max(0, index), tabs.count - 1)
+        guard target != from else { return }
+        let tab = tabs.remove(at: from)
+        tabs.insert(tab, at: target)
+    }
     func select(_ id: UUID) {
         guard id != selectedID, canSwitch, tabs.contains(where: { $0.id == id }) else { return }
         current.session.commitTransform()
         selectedID = id
         current.controller.window = window
+        current.controller.resumeExternalChangeCheck()
     }
     func newCanvas() {
         guard canSwitch else { return }
@@ -103,8 +113,32 @@ final class ProjectWorkspace {
     /// The order Quit (and closing the window) asks about unsaved projects: the tab on screen first,
     /// then the rest left to right, so it never jumps to another project before the one you're viewing.
     var quitOrder: [ProjectTab] { [current] + tabs.filter { $0.id != current.id } }
+    private func finishTextEditing() -> Bool {
+        for tab in quitOrder where tab.session.textDraft != nil {
+            guard tab.session.finishText() else { return false }
+        }
+        return true
+    }
+    /// Readies the project on screen for quitting or closing, rather than refusing over what's in progress. Edits on
+    /// the canvas (a gradient waiting for Apply, pixels being moved) are applied, as switching tools does; an open dialog
+    /// (a filter, Levels, Hue/Saturation, the color picker…) is cancelled, as its Cancel button would, so nothing is
+    /// applied that wasn't OK'd.
+    func settlePendingEdits() async {
+        let session = current.session
+        if session.gradientEdit != nil { await session.commitGradient() }
+        if session.pixelMove != nil { await session.finishPixelMove() }
+        session.cancelFilter()
+        session.cancelHueSaturation()
+        session.cancelLevels()
+        session.finishAdjustmentEditing(commit: false)
+        session.cancelColorRange()
+        session.selectionAmountOperation = nil
+        if session.colorPicker != nil { session.closeColorPicker(commit: false) }
+    }
     func confirmQuit() async -> Bool {
-        guard canSwitch else { return false }
+        guard !isManaging, finishTextEditing() else { return false }
+        await settlePendingEdits()
+        guard canSwitch else { NSSound.beep(); return false }
         isManaging = true; defer { isManaging = false }
         for tab in quitOrder {
             selectedID = tab.id; tab.controller.window = window
@@ -191,7 +225,7 @@ final class ProjectWorkspace {
         var copied = sourceDocument.layers.filter { included.contains($0.id) }
         let used = target.session.document?.layers.reduce(0) { $0 + ($1.asset.map { $0.image.width * $0.image.height } ?? 0) } ?? 0
         let added = copied.reduce(0) { $0 + ($1.asset.map { $0.image.width * $0.image.height } ?? 0) }
-        guard used + added <= 100_000_000 else { target.session.importError = "The copied layers exceed this project’s 100-megapixel limit."; return }
+        guard used + added <= DocumentLimits.documentPixelBudget else { target.session.importError = "The copied layers exceed this project’s \(DocumentLimits.documentBudgetMegapixels)-megapixel limit."; return }
         isManaging = true
         sourceTab.session.isProjectBusy = true
         target.session.isProjectBusy = true
