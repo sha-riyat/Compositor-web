@@ -438,7 +438,7 @@ nonisolated enum LayerEffectsRenderer {
         guard effects.isValid else { throw ProjectError.invalid }
         let inset = margin(for: effects)
         let width = image.width + Int(inset) * 2, height = image.height + Int(inset) * 2
-        guard width > 0, height > 0, width * height <= 100_000_000 else { throw ProjectError.tooLarge }
+        guard width > 0, height > 0, width * height <= DocumentLimits.maxSurfacePixels else { throw ProjectError.tooLarge }
         let placed = CGRect(x: inset, y: inset, width: CGFloat(image.width), height: CGFloat(image.height))
         let full = CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height))
         // The layer as it is shown: its pixels through its mask.
