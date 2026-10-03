@@ -166,6 +166,29 @@ test('sur une image existante, deux traits, puis annuler et rétablir : le GPU s
   expect((await composed(page, [600], 290))[0]).toEqual([600 % 256, 290 % 256, 90, 255]);
 });
 
+test('une pointe douce translucide : l’opacité plafonne le trait, et le GPU suit le CPU', async ({ page }) => {
+  await open(page, 700, 300);
+  await page.evaluate(() => {
+    (window as never as Globals).__compositor.uiStore.setState({
+      brush: { diameter: 120, hardness: 0, red: 1, green: 1, blue: 1, opacity: 0.4 },
+    });
+  });
+  await page.keyboard.press('b');
+  await stroke(page, [[100, 150], [600, 150], [600, 60], [350, 60], [350, 280]]);
+  const result = await gpuAgainstCpu(page);
+  expect(result.count).toBe(0);
+  const alphas = await page.evaluate(() => {
+    const { documentStore } = (window as never as Globals).__compositor;
+    const { document, assets } = documentStore.getState();
+    const data = assets.get(document!.layers[0]!.asset!)!.data;
+    let max = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i]! > max) max = data[i]!;
+    return { max, crossing: data[(150 * 700 + 350) * 4 + 3] };
+  });
+  // 40 % de 255 : le croisement, peint deux fois, ne dépasse pas le plafond.
+  expect(alphas).toEqual({ max: 102, crossing: 102 });
+});
+
 test('Ctrl+Z pendant un trait ne fait rien : le geste se termine en une entrée', async ({ page }) => {
   await open(page, 400, 200);
   await page.keyboard.press('b');

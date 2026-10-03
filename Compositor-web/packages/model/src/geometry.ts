@@ -143,3 +143,43 @@ export const toLayerPixels = (t: Transform, width: number, height: number, p: Po
     y: ((t.flipY ? -ly : ly) / t.size.height + 0.5) * height,
   };
 };
+
+/** Une transformation affine : `x' = a·x + c·y + tx`, `y' = b·x + d·y + ty`. */
+export interface Affine {
+  readonly a: number;
+  readonly b: number;
+  readonly c: number;
+  readonly d: number;
+  readonly tx: number;
+  readonly ty: number;
+}
+
+/**
+ * Pixels d'un calque de `width` × `height` → document : `pixelToDocument` de
+ * `BrushStroke.swift`. Le centre du calque, sa rotation, ses retournements et
+ * sa mise à l'échelle.
+ */
+export const pixelToDocument = (t: Transform, width: number, height: number): Affine => {
+  const radians = transformRadians(t);
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const sx = (t.size.width / width) * (t.flipX ? -1 : 1);
+  const sy = (t.size.height / height) * (t.flipY ? -1 : 1);
+  const a = cos * sx;
+  const b = sin * sx;
+  const c = -sin * sy;
+  const d = cos * sy;
+  const center = transformCenter(t);
+  return { a, b, c, d, tx: center.x - (a * width + c * height) / 2, ty: center.y - (b * width + d * height) / 2 };
+};
+
+export const applyAffine = (m: Affine, p: Point): Point => ({ x: m.a * p.x + m.c * p.y + m.tx, y: m.b * p.x + m.d * p.y + m.ty });
+
+export const invertAffine = (m: Affine): Affine => {
+  const det = m.a * m.d - m.b * m.c;
+  const a = m.d / det;
+  const b = -m.b / det;
+  const c = -m.c / det;
+  const d = m.a / det;
+  return { a, b, c, d, tx: -(a * m.tx + c * m.ty), ty: -(b * m.tx + d * m.ty) };
+};

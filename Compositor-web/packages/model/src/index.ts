@@ -13,3 +13,4 @@ export * from './ids.js';
 export * from './raster.js';
 export * from './brush.js';
 export * from './paint.js';
+export * from './brushTip.js';
