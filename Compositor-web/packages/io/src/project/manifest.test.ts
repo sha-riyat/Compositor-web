@@ -162,3 +162,10 @@ describe('les manifestes refusés', () => {
     expect(kind(withLayer(1, { parentID: layerOf(valid(), 0).id }))).toBe('invalid');
   });
 });
+
+/** `ProjectTests.theCurrentFormatVersionIsOneTheReaderAccepts`. */
+test('la version écrite est une version que la lecture accepte', async () => {
+  const { CURRENT_VERSION, SUPPORTED_VERSIONS } = await import('./manifest.js');
+  expect(CURRENT_VERSION).toBeGreaterThanOrEqual(SUPPORTED_VERSIONS.min);
+  expect(CURRENT_VERSION).toBeLessThanOrEqual(SUPPORTED_VERSIONS.max);
+});

@@ -7,6 +7,7 @@ import {
   createLayer,
   documentStore,
   edit,
+  newId,
   fitViewport,
   isDocumentOpaque,
   setActiveLayer,
@@ -77,10 +78,10 @@ export const Editor = (): React.ReactElement => {
 
       const current: CompositorDocument =
         state.document ??
-        createDocument(crypto.randomUUID(), buffer.width, buffer.height);
+        createDocument(newId(), buffer.width, buffer.height);
 
       const layer = createLayer(
-        crypto.randomUUID(),
+        newId(),
         file.name.replace(/\.[^.]+$/, ''),
         identityTransform(
           { width: buffer.width, height: buffer.height },
