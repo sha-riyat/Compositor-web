@@ -1,23 +1,31 @@
 import {
-  BrushStroke,
   paintTarget,
   setLayerAsset,
   type BrushSettings,
   type Layer,
+  type PaintStroke,
+  type RasterHandoff,
+  type TiledRaster,
   type Tool,
   type ToolApi,
-  type ToolEvent,
 } from '@compositor/model';
+import { noteSettle } from '../latency.js';
 
 /**
  * L'outil Brosse — `beginBrush`, `continueBrush` et `finishBrushImmediately`
  * de `EditorSession+Brush.swift`.
  *
- * Le document ne change qu'au relâchement : d'ici là, seules les tuiles
- * touchées partent vers l'aperçu. Le trait entier est **une** entrée
- * d'annulation, « Coup de brosse » ; un trait qui n'a rien peint n'en
- * laisse aucune.
+ * Le document ne change qu'au relâchement : d'ici là, le trait ne fait que
+ * dessiner son aperçu. Le trait entier est **une** entrée d'annulation,
+ * « Coup de brosse » ; un trait qui n'a rien peint n'en laisse aucune.
+ *
+ * Peint par le GPU, le raster arrive quelques images après le relâchement :
+ * ses tuiles sont relues par petits morceaux, l'aperçu restant affiché. Un
+ * nouveau trait commencé avant termine d'abord cette relecture.
  */
+
+/** Le temps qu'une image peut consacrer à la relecture, en millisecondes. */
+const READBACK_BUDGET_MS = 6;
 
 export interface BrushToolDeps {
   readonly settings: () => BrushSettings;
@@ -25,21 +33,49 @@ export interface BrushToolDeps {
 
 interface Active {
   readonly layer: Layer;
-  readonly stroke: BrushStroke;
+  readonly stroke: PaintStroke;
+}
+
+interface Pending {
+  readonly layer: Layer;
+  readonly stroke: PaintStroke;
+  readonly handoff: RasterHandoff;
+  readonly api: ToolApi;
+  readonly releasedAt: number;
 }
 
 export const createBrushTool = (deps: BrushToolDeps): Tool => {
   let active: Active | null = null;
+  let pending: Pending | null = null;
 
-  const append = (event: ToolEvent): void => {
-    if (active === null) return;
-    active.stroke.append(event.point);
+  /** Le raster est prêt : il entre dans le document, et l'aperçu devient sa texture. */
+  const commit = (raster: TiledRaster | null): void => {
+    const { layer, stroke, api, releasedAt } = pending!;
+    pending = null;
+    if (raster === null) {
+      api.endHistory();
+      stroke.cancel();
+    } else {
+      const asset = api.assets.addRaster(raster);
+      api.mutate((document) => setLayerAsset(document, layer.id, asset));
+      api.endHistory();
+      stroke.adopt(asset);
+    }
+    noteSettle(performance.now() - releasedAt);
+    api.requestRedraw();
   };
 
-  /** Les tuiles sont recomposées une fois par lot d'échantillons, pas par échantillon. */
-  const flush = (api: ToolApi): void => {
+  const drive = (): void => {
+    if (pending === null) return;
+    const raster = pending.handoff.step(READBACK_BUDGET_MS);
+    if (raster === undefined) requestAnimationFrame(drive);
+    else commit(raster);
+  };
+
+  /** L'aperçu se met à jour une fois par lot d'échantillons, pas par échantillon. */
+  const present = (api: ToolApi): void => {
     if (active === null) return;
-    api.updateStroke(active.stroke.takeDirty());
+    active.stroke.present();
     api.requestRedraw();
   };
 
@@ -51,6 +87,8 @@ export const createBrushTool = (deps: BrushToolDeps): Tool => {
     cursor: () => 'crosshair',
 
     onPointerDown(event, api) {
+      // Le trait précédent doit être dans le document avant que celui-ci ne parte de ses pixels.
+      if (pending !== null) commit(pending.handoff.complete());
       const { target, refusal } = paintTarget(api.document, api.activeLayerId, api.selectedLayerIds);
       if (target === null) {
         if (refusal !== null) api.notify(refusal);
@@ -62,47 +100,36 @@ export const createBrushTool = (deps: BrushToolDeps): Tool => {
       const width = source?.width ?? Math.max(1, Math.round(size.width));
       const height = source?.height ?? Math.max(1, Math.round(size.height));
       const document = api.document!;
-      const stroke = new BrushStroke(
+      // Ouverte dès la pression : pendant le geste, l'historique refuse
+      // d'annuler, et le trait ne peut pas se poser sur un état annulé.
+      api.beginHistory('Coup de brosse');
+      const stroke = api.beginStroke(
+        target.id,
+        target.asset,
         { width, height, source, transform: target.transform, canvas: { width: document.width, height: document.height } },
         deps.settings(),
       );
       active = { layer: target, stroke };
-      // Ouverte dès la pression : pendant le geste, l'historique refuse
-      // d'annuler, et le trait ne peut pas se poser sur un état annulé.
-      api.beginHistory('Coup de brosse');
-      api.beginStroke(target.id, target.asset, width, height);
-      append(event);
-      flush(api);
+      stroke.append(event.point);
+      present(api);
     },
 
     onPointerMove(event) {
-      append(event);
+      active?.stroke.append(event.point);
     },
 
     onInputBatchEnd(api) {
-      flush(api);
+      present(api);
     },
 
     onPointerUp(event, api) {
       if (active === null) return;
-      append(event);
-      // La fin provisoire devient sa courbe, puis l'aperçu reçoit ces dernières
-      // tuiles : sa texture va représenter le raster, elle doit lui être égale.
-      active.stroke.flush();
-      flush(api);
       const { layer, stroke } = active;
       active = null;
-      const raster = stroke.commit();
-      if (raster === null) {
-        api.endHistory();
-        api.cancelStroke();
-        return;
-      }
-      const asset = api.assets.addRaster(raster);
-      api.mutate((document) => setLayerAsset(document, layer.id, asset));
-      api.endHistory();
-      api.commitStroke(asset);
+      stroke.append(event.point);
+      pending = { layer, stroke, handoff: stroke.finish(), api, releasedAt: performance.now() };
       api.requestRedraw();
+      drive();
     },
   };
 };

@@ -2,7 +2,7 @@ import type { AssetStore, BlendMode, CompositorDocument } from '@compositor/mode
 import { effectiveOpacity, isEffectivelyVisible, layersById } from '@compositor/model';
 import { createProgram, type RenderContext } from './context.js';
 import { TextureCache } from './textures.js';
-import { StrokePreview } from './strokePreview.js';
+import { BrushEngine } from './brushEngine.js';
 import { TransformOverlay } from './overlay.js';
 import { RenderTarget } from './target.js';
 import {
@@ -105,8 +105,8 @@ const FULL_TARGET = mat3Multiply(mat3Translate(-1, -1), mat3Scale(2, 2));
 export class Compositor {
   #context: RenderContext;
   #textures: TextureCache;
-  /** L'aperçu du trait de brosse en cours, s'il y en a un. */
-  readonly strokes: StrokePreview;
+  /** La brosse : son moteur, et l'aperçu du trait en cours. */
+  readonly brush: BrushEngine;
   #overlay: TransformOverlay;
   #ping: RenderTarget;
   #pong: RenderTarget;
@@ -131,7 +131,7 @@ export class Compositor {
   constructor(context: RenderContext, assets: AssetStore) {
     this.#context = context;
     this.#textures = new TextureCache(context.gl, assets);
-    this.strokes = new StrokePreview(context.gl, this.#textures);
+    this.brush = new BrushEngine(context.gl, this.#textures);
 
     const gl = context.gl;
     this.#program = createProgram(gl, VERTEX_SOURCE, FRAGMENT_SOURCE);
@@ -254,7 +254,7 @@ export class Compositor {
 
       // Un calque en train d'être peint — même vide — se dessine depuis l'aperçu.
       const entry =
-        this.strokes.textureFor(layer.id) ?? (layer.asset === null ? undefined : this.#textures.get(layer.asset));
+        this.brush.preview.textureFor(layer.id) ?? (layer.asset === null ? undefined : this.#textures.get(layer.asset));
       if (entry === undefined) continue;
 
       const matrix = mat3Multiply(view, mat3ForTransform(layer.transform));
@@ -373,7 +373,7 @@ export class Compositor {
 
   dispose(): void {
     const gl = this.#context.gl;
-    this.strokes.cancel();
+    this.brush.preview.cancel();
     this.#textures.clear();
     this.#overlay.dispose();
     this.#ping.dispose();

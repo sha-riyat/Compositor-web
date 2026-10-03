@@ -16,7 +16,8 @@ type Globals = {
     compositor?: unknown;
     documentStore: { getState(): { assets: { add(b: unknown): string } }; setState(s: unknown): void };
     uiStore: { setState(s: unknown): void };
-    gestureTimings: { inputToFrame: number[]; update: number[]; render: number[] };
+    gestureTimings: { inputToFrame: number[]; update: number[]; render: number[]; release: number[]; settle: number[]; waitForGpu: boolean };
+    isEditing(): boolean;
     resetGestureTimings(): void;
     summarize(series: number[]): Summary;
   };
@@ -76,6 +77,7 @@ const bench = async (page: Page, opaque: boolean, diameter: number, hardness: nu
       await page.mouse.move(p.x, p.y);
     }
     await page.mouse.up();
+    await page.waitForFunction(() => !(window as never as Globals).__compositor.isEditing());
   }
   return page.evaluate(() => {
     const { gestureTimings, summarize } = (window as never as Globals).__compositor;
@@ -83,6 +85,8 @@ const bench = async (page: Page, opaque: boolean, diameter: number, hardness: nu
       inputToFrame: summarize(gestureTimings.inputToFrame),
       update: summarize(gestureTimings.update),
       render: summarize(gestureTimings.render),
+      release: summarize(gestureTimings.release),
+      settle: summarize(gestureTimings.settle),
     };
   });
 };
@@ -97,14 +101,21 @@ test('banc 4000 × 3000 : latence d’un trait, pointes dure et douce de 40 et 3
     const info = gl.getExtension('WEBGL_debug_renderer_info');
     return info === null ? 'inconnu' : String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL));
   });
-  const rows: string[] = [`GPU : ${gpu}`];
+  // Chaque image attend la fin du travail du GPU : la latence mesurée est celle d'une image finie.
+  await page.evaluate(() => {
+    (window as never as Globals).__compositor.gestureTimings.waitForGpu = true;
+  });
+  const engine = await page.evaluate(
+    () => (window as never as { __compositor: { compositor: { brush: { engine: string } } } }).__compositor.compositor.brush.engine,
+  );
+  const rows: string[] = [`GPU : ${gpu} · moteur : ${engine} · images attendues jusqu'à la fin du GPU`];
   for (const hardness of [1, 0]) for (const opaque of [false, true]) {
     for (const diameter of [40, 300]) {
       const result = await bench(page, opaque, diameter, hardness);
       expect(result.update.count).toBeGreaterThan(100);
       const f = (s: Summary) => `${s.median.toFixed(2)} / ${s.p95.toFixed(2)} ms (${s.count})`;
       rows.push(
-        `${hardness === 1 ? 'dure ' : 'douce'} ${opaque ? 'opaque' : 'vide  '} ${String(diameter).padStart(3)} px — entrée→image ${f(result.inputToFrame)} · mise à jour ${f(result.update)} · dessin ${f(result.render)}`,
+        `${hardness === 1 ? 'dure ' : 'douce'} ${opaque ? 'opaque' : 'vide  '} ${String(diameter).padStart(3)} px — entrée→image ${f(result.inputToFrame)} · mise à jour ${f(result.update)} · dessin ${f(result.render)} · relâchement ${f(result.release)} · entrée au document ${f(result.settle)}`,
       );
     }
   }
