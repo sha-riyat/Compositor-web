@@ -25,9 +25,9 @@ type Globals = {
 const WIDTH = 4000;
 const HEIGHT = 3000;
 
-const setUp = async (page: Page, opaque: boolean, diameter: number) => {
+const setUp = async (page: Page, opaque: boolean, diameter: number, hardness: number) => {
   await page.evaluate(
-    ({ opaque, diameter, WIDTH, HEIGHT }) => {
+    ({ opaque, diameter, hardness, WIDTH, HEIGHT }) => {
       const { documentStore, uiStore } = (window as never as Globals).__compositor;
       let asset: string | null = null;
       if (opaque) {
@@ -46,9 +46,9 @@ const setUp = async (page: Page, opaque: boolean, diameter: number) => {
         activeLayerId: 'peint',
         selectedLayerIds: ['peint'],
       });
-      uiStore.setState({ tool: 'brush', brush: { diameter, hardness: 1, red: 1, green: 1, blue: 1, opacity: 1 } });
+      uiStore.setState({ tool: 'brush', brush: { diameter, hardness, red: 1, green: 1, blue: 1, opacity: 1 } });
     },
-    { opaque, diameter, WIDTH, HEIGHT },
+    { opaque, diameter, hardness, WIDTH, HEIGHT },
   );
 };
 
@@ -62,8 +62,8 @@ const fit = async (page: Page) => {
   return (x: number, y: number) => ({ x: box.x + offsetX + x * scale, y: box.y + offsetY + y * scale });
 };
 
-const bench = async (page: Page, opaque: boolean, diameter: number) => {
-  await setUp(page, opaque, diameter);
+const bench = async (page: Page, opaque: boolean, diameter: number, hardness: number) => {
+  await setUp(page, opaque, diameter, hardness);
   const toPage = await fit(page);
   await page.evaluate(() => (window as never as Globals).__compositor.resetGestureTimings());
   for (let pass = 0; pass < 2; pass++) {
@@ -87,8 +87,8 @@ const bench = async (page: Page, opaque: boolean, diameter: number) => {
   });
 };
 
-test('banc 4000 × 3000 : latence d’un trait, brosses de 40 et 300 px', async ({ page }) => {
-  test.setTimeout(180_000);
+test('banc 4000 × 3000 : latence d’un trait, pointes dure et douce de 40 et 300 px', async ({ page }) => {
+  test.setTimeout(300_000);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
   await page.waitForFunction(() => (window as never as Globals).__compositor?.compositor !== undefined);
@@ -98,13 +98,13 @@ test('banc 4000 × 3000 : latence d’un trait, brosses de 40 et 300 px', async 
     return info === null ? 'inconnu' : String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL));
   });
   const rows: string[] = [`GPU : ${gpu}`];
-  for (const opaque of [false, true]) {
+  for (const hardness of [1, 0]) for (const opaque of [false, true]) {
     for (const diameter of [40, 300]) {
-      const result = await bench(page, opaque, diameter);
+      const result = await bench(page, opaque, diameter, hardness);
       expect(result.update.count).toBeGreaterThan(100);
       const f = (s: Summary) => `${s.median.toFixed(2)} / ${s.p95.toFixed(2)} ms (${s.count})`;
       rows.push(
-        `${opaque ? 'opaque' : 'vide  '} ${String(diameter).padStart(3)} px — entrée→image ${f(result.inputToFrame)} · mise à jour ${f(result.update)} · dessin ${f(result.render)}`,
+        `${hardness === 1 ? 'dure ' : 'douce'} ${opaque ? 'opaque' : 'vide  '} ${String(diameter).padStart(3)} px — entrée→image ${f(result.inputToFrame)} · mise à jour ${f(result.update)} · dessin ${f(result.render)}`,
       );
     }
   }

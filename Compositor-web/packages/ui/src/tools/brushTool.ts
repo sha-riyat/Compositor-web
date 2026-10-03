@@ -2,7 +2,6 @@ import {
   BrushStroke,
   paintTarget,
   setLayerAsset,
-  toLayerPixels,
   type BrushSettings,
   type Layer,
   type Tool,
@@ -34,8 +33,7 @@ export const createBrushTool = (deps: BrushToolDeps): Tool => {
 
   const append = (event: ToolEvent): void => {
     if (active === null) return;
-    const { layer, stroke } = active;
-    stroke.append(toLayerPixels(layer.transform, stroke.width, stroke.height, event.point));
+    active.stroke.append(event.point);
   };
 
   /** Les tuiles sont recomposées une fois par lot d'échantillons, pas par échantillon. */
@@ -63,9 +61,12 @@ export const createBrushTool = (deps: BrushToolDeps): Tool => {
       // Un calque vide a la taille de son placement, en pixels entiers.
       const width = source?.width ?? Math.max(1, Math.round(size.width));
       const height = source?.height ?? Math.max(1, Math.round(size.height));
-      const settings = deps.settings();
-      const radius = (settings.diameter / 2) * (width / size.width);
-      active = { layer: target, stroke: new BrushStroke({ width, height, source }, settings, radius) };
+      const document = api.document!;
+      const stroke = new BrushStroke(
+        { width, height, source, transform: target.transform, canvas: { width: document.width, height: document.height } },
+        deps.settings(),
+      );
+      active = { layer: target, stroke };
       // Ouverte dès la pression : pendant le geste, l'historique refuse
       // d'annuler, et le trait ne peut pas se poser sur un état annulé.
       api.beginHistory('Coup de brosse');
@@ -85,7 +86,9 @@ export const createBrushTool = (deps: BrushToolDeps): Tool => {
     onPointerUp(event, api) {
       if (active === null) return;
       append(event);
-      // L'aperçu doit tenir exactement le raster : sa texture va le représenter.
+      // La fin provisoire devient sa courbe, puis l'aperçu reçoit ces dernières
+      // tuiles : sa texture va représenter le raster, elle doit lui être égale.
+      active.stroke.flush();
       flush(api);
       const { layer, stroke } = active;
       active = null;
